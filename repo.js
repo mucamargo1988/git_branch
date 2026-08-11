@@ -89,7 +89,7 @@
     e.proximoId = e.proximoId + 1;
     br.pontaId = id;
 
-    var comando = 'git commit -m "' + mensagem + '"';
+    var comando = 'git commit -m "' + mensagem.replace(/"/g, '\\"') + '"';
     registrar(e, comando);
     return { ok: true, estado: e, comando: comando };
   }
@@ -127,6 +127,24 @@
 
     estado.devs.push({ id: id, nome: nome, emoji: emoji });
     return id;
+  }
+
+  // Renomear quem é dono de uma branch NÃO é uma operação de Git — é só trocar a
+  // etiqueta da pessoa. Por isso não entra no histórico de comandos.
+  function editarDev(estado, donoId, nome, emoji) {
+    nome = (nome || "").trim();
+    if (!nome) {
+      return { ok: false, erro: "O nome não pode ficar vazio." };
+    }
+    var e = clonar(estado);
+    for (var i = 0; i < e.devs.length; i++) {
+      if (e.devs[i].id === donoId) {
+        e.devs[i].nome = nome;
+        e.devs[i].emoji = (emoji || "").trim() || e.devs[i].emoji;
+        return { ok: true, estado: e };
+      }
+    }
+    return { ok: false, erro: "Pessoa não encontrada." };
   }
 
   function criarBranch(estado, nome, dono, jaMudar) {
@@ -322,7 +340,7 @@
     acharCommit: acharCommit,
     branchAtual: branchAtual,
     commit: commit,
-    registrarDev: registrarDev,
+    editarDev: editarDev,
     criarBranch: criarBranch,
     checkout: checkout,
     alcancaveis: alcancaveis,

@@ -25,6 +25,18 @@
       // do zero.
       if (!estado || !estado.branches || !estado.HEAD ||
           !estado.historico || !estado.devs || !estado.commits) return null;
+
+      // Coerência: o HEAD precisa apontar para uma branch que realmente existe
+      // e proximoId precisa ser o número que as próximas operações vão usar.
+      // Sem isto, um localStorage de uma versão antiga passa pelo guard acima
+      // e só quebra depois, dentro de pintarBarra, com a tela em branco e
+      // nenhuma pista fora do DevTools.
+      var branchExiste = false;
+      for (var i = 0; i < estado.branches.length; i++) {
+        if (estado.branches[i].nome === estado.HEAD.branch) { branchExiste = true; break; }
+      }
+      if (!branchExiste || typeof estado.proximoId !== "number") return null;
+
       return estado;
     } catch (err) {
       return null;

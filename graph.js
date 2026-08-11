@@ -116,7 +116,7 @@
       item.g.setAttribute("transform", "translate(" + n.x + "," + n.y + ")");
       item.circulo.setAttribute("fill", n.cor);
       item.emoji.textContent = n.emoji;
-      item.msg.textContent = n.mensagem.length > 16 ? n.mensagem.slice(0, 15) + "…" : n.mensagem;
+      item.msg.textContent = n.mensagem.length > 12 ? n.mensagem.slice(0, 11) + "…" : n.mensagem;
       item.titulo.textContent = n.id + " — " + n.mensagem;
     });
 
@@ -151,7 +151,7 @@
       }
 
       var rotulo = e.emoji + " " + e.nome;
-      var largura = 22 + rotulo.length * 9.5;
+      var largura = e.larguraPilula;
 
       item.g.setAttribute("transform", "translate(" + e.x + "," + e.y + ")");
 

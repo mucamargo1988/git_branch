@@ -86,6 +86,12 @@ teste("commit registra o comando no histórico", function () {
   igual(r.estado.historico[1], { n: 2, comando: 'git commit -m "header"' });
 });
 
+teste("commit escapa aspas duplas no comando registrado, mas guarda a mensagem crua", function () {
+  var r = Repo.commit(Repo.estadoInicial(), 'ele disse "oi"');
+  igual(r.estado.commits[0].mensagem, 'ele disse "oi"', "a mensagem guardada não muda");
+  igual(r.comando, 'git commit -m "ele disse \\"oi\\""', "o comando logado escapa as aspas");
+});
+
 teste("commit sem mensagem é rejeitado", function () {
   var r = Repo.commit(Repo.estadoInicial(), "   ");
   igual(r.ok, false);
@@ -164,6 +170,50 @@ teste("nomes acentuados diferentes não viram a mesma pessoa", function () {
   r2.estado.devs.forEach(function (d) { nomes[d.id] = d.nome; });
   igual(nomes[idA], "José");
   igual(nomes[idB], "Josué", "o projetor mostraria o nome errado do aluno");
+});
+
+// ---------- repo.js: editarDev ----------
+
+teste("editarDev muda o nome e o emoji em todo lugar que o dev é referenciado", function () {
+  var e = Repo.criarBranch(comUmCommit(), "feature/x", { nome: "Ana", emoji: "👩" }, false).estado;
+  var donoId = Repo.acharBranch(e, "feature/x").donoId;
+
+  var r = Repo.editarDev(e, donoId, "Ana Paula", "👩‍💻");
+  verdade(r.ok, r.erro);
+
+  var dev = null;
+  for (var i = 0; i < r.estado.devs.length; i++) {
+    if (r.estado.devs[i].id === donoId) dev = r.estado.devs[i];
+  }
+  verdade(dev, "o dev precisa continuar existindo com o mesmo id");
+  igual(dev.nome, "Ana Paula");
+  igual(dev.emoji, "👩‍💻");
+});
+
+teste("editarDev não registra comando no histórico", function () {
+  var e = comUmCommit();
+  var donoId = e.devs[0].id;
+  var tamanhoAntes = e.historico.length;
+
+  var r = Repo.editarDev(e, donoId, "Outro Nome", "🙂");
+  verdade(r.ok, r.erro);
+  igual(r.estado.historico.length, tamanhoAntes, "editar o dono não é um comando de Git");
+  igual(r.comando, undefined, "não deve haver comando algum no resultado");
+});
+
+teste("editarDev não muta o estado recebido", function () {
+  var e = comUmCommit();
+  var donoId = e.devs[0].id;
+  var nomeOriginal = e.devs[0].nome;
+
+  Repo.editarDev(e, donoId, "Mudou", "🙂");
+  igual(e.devs[0].nome, nomeOriginal, "o estado original não pode mudar");
+});
+
+teste("editarDev rejeita nome vazio e pessoa inexistente", function () {
+  var e = comUmCommit();
+  igual(Repo.editarDev(e, e.devs[0].id, "   ", "🙂").ok, false);
+  igual(Repo.editarDev(e, "nao-existe", "Nome", "🙂").ok, false);
 });
 
 teste("nome de branch repetido é rejeitado", function () {
@@ -245,6 +295,13 @@ teste("merge com os dois lados avançados cria commit de merge com dois pais", f
   igual(m.pais, [c.c1, c.c2], "primeiro pai é a branch atual, segundo é a origem");
   igual(m.faixa, 0, "o commit de merge nasce na faixa da branch de destino");
   igual(Repo.acharBranch(r.estado, "master").pontaId, m.id);
+});
+
+teste("merge não muta o estado recebido (caso commit-de-merge)", function () {
+  var c = cenarioDivergente();
+  var antes = JSON.stringify(c.estado);
+  Repo.merge(c.estado, "feature");
+  igual(JSON.stringify(c.estado), antes, "o estado original não pode mudar");
 });
 
 teste("merge sem nada a trazer avisa Already up to date e não cria commit", function () {
@@ -333,6 +390,11 @@ teste("commitsAlcancaveis lista do mais novo ao mais antigo, sem a ponta atual",
 
 teste("commitsAlcancaveis em repositório vazio devolve lista vazia", function () {
   igual(Repo.commitsAlcancaveis(Repo.estadoInicial()), []);
+});
+
+teste("commitsAlcancaveis devolve lista vazia quando a ponta atual é o único commit", function () {
+  var e = comUmCommit();
+  igual(Repo.commitsAlcancaveis(e), [], "o único commit é a própria ponta, não entra na lista");
 });
 
 // ---------- layout.js ----------
@@ -446,6 +508,20 @@ teste("exatamente uma etiqueta é marcada como HEAD", function () {
   }
   igual(comHead, 1);
   igual(nomeHead, "feature");
+});
+
+teste("a largura do layout reserva espaço para o marcador ◀ HEAD mesmo com nome de branch longo", function () {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  e = Repo.criarBranch(e, "feature/autenticacao", { nome: "Ana", emoji: "👩" }, true).estado;
+  var l = Layout.calcular(e);
+
+  var etiqueta = null;
+  for (var i = 0; i < l.etiquetas.length; i++) {
+    if (l.etiquetas[i].nome === "feature/autenticacao") etiqueta = l.etiquetas[i];
+  }
+  verdade(etiqueta, "a etiqueta da branch precisa existir");
+  verdade(l.largura > etiqueta.x + etiqueta.larguraPilula + Layout.LARGURA_HEAD,
+    "o marcador ◀ HEAD precisa caber depois da pílula, dentro da largura do layout");
 });
 
 teste("nós carregam a cor da faixa e o emoji do autor", function () {

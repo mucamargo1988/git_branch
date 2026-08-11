@@ -3,6 +3,8 @@
 App de projetor para explicar branches de Git em aula. Sem instalação, sem internet,
 sem banco de dados.
 
+O app usa tema escuro, pensado para uma sala com a luz baixa e o projetor ligado.
+
 ## Como usar
 
 Dê duplo clique em `index.html`.

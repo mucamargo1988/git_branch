@@ -14,7 +14,7 @@
   var MARGEM_Y = 70;
   var DESLOC_ETIQUETA_X = 34;  // etiqueta fica à direita do commit-ponta
   var ALTURA_ETIQUETA = 30;    // passo do empilhamento
-  var ESPACO_ETIQUETAS = 240;  // folga à direita para caber as etiquetas
+  var LARGURA_HEAD = 62;       // folga para "◀ HEAD" depois da pílula, com margem
   var COR_FANTASMA = "#64748b"; // cinza-ardósia: visível no escuro, claramente apagado
 
   function calcular(estado) {
@@ -94,14 +94,17 @@
       var grupo = porPonta[pontaId];
       var centro = ((grupo.length - 1) * ALTURA_ETIQUETA) / 2;
       for (var g = 0; g < grupo.length; g++) {
+        var emoji = emojiDoDev[grupo[g].donoId] || "🧑‍💻";
+        var rotulo = emoji + " " + grupo[g].nome;
         etiquetas.push({
           nome: grupo[g].nome,
           cor: grupo[g].cor,
-          emoji: emojiDoDev[grupo[g].donoId] || "🧑‍💻",
+          emoji: emoji,
           commitId: pontaId,
           x: pos[pontaId].x + DESLOC_ETIQUETA_X,
           y: pos[pontaId].y + g * ALTURA_ETIQUETA - centro,
-          ehHead: estado.HEAD.branch === grupo[g].nome
+          ehHead: estado.HEAD.branch === grupo[g].nome,
+          larguraPilula: 22 + rotulo.length * 9.5
         });
       }
     }
@@ -110,6 +113,7 @@
     var faixas = [];
     for (var f = 0; f < estado.branches.length; f++) {
       var bf = estado.branches[f];
+      if (!bf.pontaId) continue; // branch ainda sem commit não tem faixa para desenhar
       faixas.push({
         indice: bf.faixa,
         y: MARGEM_Y + bf.faixa * ESPACO_Y,
@@ -135,12 +139,21 @@
     for (var m = 0; m < nos.length; m++) if (nos[m].x > maiorX) maiorX = nos[m].x;
     var ultimaFaixa = faixas.length > 0 ? faixas[faixas.length - 1].indice : 0;
 
+    // A largura vem do conteúdo, não de uma folga fixa: cada etiqueta reserva
+    // espaço para a própria pílula MAIS o marcador "◀ HEAD", ainda que ela não
+    // seja o HEAD agora — assim o canvas não pula de largura quando o HEAD muda.
+    var largura = maiorX + RAIO + 20;
+    for (var ie = 0; ie < etiquetas.length; ie++) {
+      var direita = etiquetas[ie].x + etiquetas[ie].larguraPilula + 10 + LARGURA_HEAD;
+      if (direita > largura) largura = direita;
+    }
+
     return {
       nos: nos,
       arestas: arestas,
       etiquetas: etiquetas,
       faixas: faixas,
-      largura: maiorX + ESPACO_ETIQUETAS,
+      largura: largura,
       altura: MARGEM_Y + (ultimaFaixa + 1) * ESPACO_Y,
       vazio: nos.length === 0
     };
@@ -153,6 +166,7 @@
     ESPACO_Y: ESPACO_Y,
     MARGEM_X: MARGEM_X,
     MARGEM_Y: MARGEM_Y,
+    LARGURA_HEAD: LARGURA_HEAD,
     COR_FANTASMA: COR_FANTASMA
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);

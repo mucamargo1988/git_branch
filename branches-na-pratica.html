@@ -181,6 +181,27 @@ input[type="text"]:focus, select:focus {
 .dev-nome { font-size: 15px; }
 .dev-branch { font-size: 13px; color: var(--texto-suave); }
 
+.dev.editando { cursor: default; }
+.dev.editando input[type="text"] {
+  width: auto;
+  flex: 1 1 auto;
+  margin-bottom: 0;
+  padding: 5px 7px;
+  font-size: 14px;
+}
+.dev.editando input.dev-editar-emoji { flex: 0 0 44px; text-align: center; }
+.dev.editando .dev-editar-salvar {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  background: var(--destaque);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
 /* ---------- histórico ---------- */
 
 #lista-historico { margin: 0; padding-left: 26px; font-size: 14px; }
@@ -422,7 +443,7 @@ input[type="text"]:focus, select:focus {
     e.proximoId = e.proximoId + 1;
     br.pontaId = id;
 
-    var comando = 'git commit -m "' + mensagem + '"';
+    var comando = 'git commit -m "' + mensagem.replace(/"/g, '\\"') + '"';
     registrar(e, comando);
     return { ok: true, estado: e, comando: comando };
   }
@@ -460,6 +481,24 @@ input[type="text"]:focus, select:focus {
 
     estado.devs.push({ id: id, nome: nome, emoji: emoji });
     return id;
+  }
+
+  // Renomear quem é dono de uma branch NÃO é uma operação de Git — é só trocar a
+  // etiqueta da pessoa. Por isso não entra no histórico de comandos.
+  function editarDev(estado, donoId, nome, emoji) {
+    nome = (nome || "").trim();
+    if (!nome) {
+      return { ok: false, erro: "O nome não pode ficar vazio." };
+    }
+    var e = clonar(estado);
+    for (var i = 0; i < e.devs.length; i++) {
+      if (e.devs[i].id === donoId) {
+        e.devs[i].nome = nome;
+        e.devs[i].emoji = (emoji || "").trim() || e.devs[i].emoji;
+        return { ok: true, estado: e };
+      }
+    }
+    return { ok: false, erro: "Pessoa não encontrada." };
   }
 
   function criarBranch(estado, nome, dono, jaMudar) {
@@ -655,7 +694,7 @@ input[type="text"]:focus, select:focus {
     acharCommit: acharCommit,
     branchAtual: branchAtual,
     commit: commit,
-    registrarDev: registrarDev,
+    editarDev: editarDev,
     criarBranch: criarBranch,
     checkout: checkout,
     alcancaveis: alcancaveis,
@@ -685,7 +724,7 @@ input[type="text"]:focus, select:focus {
   var MARGEM_Y = 70;
   var DESLOC_ETIQUETA_X = 34;  // etiqueta fica à direita do commit-ponta
   var ALTURA_ETIQUETA = 30;    // passo do empilhamento
-  var ESPACO_ETIQUETAS = 240;  // folga à direita para caber as etiquetas
+  var LARGURA_HEAD = 62;       // folga para "◀ HEAD" depois da pílula, com margem
   var COR_FANTASMA = "#64748b"; // cinza-ardósia: visível no escuro, claramente apagado
 
   function calcular(estado) {
@@ -765,14 +804,17 @@ input[type="text"]:focus, select:focus {
       var grupo = porPonta[pontaId];
       var centro = ((grupo.length - 1) * ALTURA_ETIQUETA) / 2;
       for (var g = 0; g < grupo.length; g++) {
+        var emoji = emojiDoDev[grupo[g].donoId] || "🧑‍💻";
+        var rotulo = emoji + " " + grupo[g].nome;
         etiquetas.push({
           nome: grupo[g].nome,
           cor: grupo[g].cor,
-          emoji: emojiDoDev[grupo[g].donoId] || "🧑‍💻",
+          emoji: emoji,
           commitId: pontaId,
           x: pos[pontaId].x + DESLOC_ETIQUETA_X,
           y: pos[pontaId].y + g * ALTURA_ETIQUETA - centro,
-          ehHead: estado.HEAD.branch === grupo[g].nome
+          ehHead: estado.HEAD.branch === grupo[g].nome,
+          larguraPilula: 22 + rotulo.length * 9.5
         });
       }
     }
@@ -781,6 +823,7 @@ input[type="text"]:focus, select:focus {
     var faixas = [];
     for (var f = 0; f < estado.branches.length; f++) {
       var bf = estado.branches[f];
+      if (!bf.pontaId) continue; // branch ainda sem commit não tem faixa para desenhar
       faixas.push({
         indice: bf.faixa,
         y: MARGEM_Y + bf.faixa * ESPACO_Y,
@@ -806,12 +849,21 @@ input[type="text"]:focus, select:focus {
     for (var m = 0; m < nos.length; m++) if (nos[m].x > maiorX) maiorX = nos[m].x;
     var ultimaFaixa = faixas.length > 0 ? faixas[faixas.length - 1].indice : 0;
 
+    // A largura vem do conteúdo, não de uma folga fixa: cada etiqueta reserva
+    // espaço para a própria pílula MAIS o marcador "◀ HEAD", ainda que ela não
+    // seja o HEAD agora — assim o canvas não pula de largura quando o HEAD muda.
+    var largura = maiorX + RAIO + 20;
+    for (var ie = 0; ie < etiquetas.length; ie++) {
+      var direita = etiquetas[ie].x + etiquetas[ie].larguraPilula + 10 + LARGURA_HEAD;
+      if (direita > largura) largura = direita;
+    }
+
     return {
       nos: nos,
       arestas: arestas,
       etiquetas: etiquetas,
       faixas: faixas,
-      largura: maiorX + ESPACO_ETIQUETAS,
+      largura: largura,
       altura: MARGEM_Y + (ultimaFaixa + 1) * ESPACO_Y,
       vazio: nos.length === 0
     };
@@ -824,6 +876,7 @@ input[type="text"]:focus, select:focus {
     ESPACO_Y: ESPACO_Y,
     MARGEM_X: MARGEM_X,
     MARGEM_Y: MARGEM_Y,
+    LARGURA_HEAD: LARGURA_HEAD,
     COR_FANTASMA: COR_FANTASMA
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
@@ -948,7 +1001,7 @@ input[type="text"]:focus, select:focus {
       item.g.setAttribute("transform", "translate(" + n.x + "," + n.y + ")");
       item.circulo.setAttribute("fill", n.cor);
       item.emoji.textContent = n.emoji;
-      item.msg.textContent = n.mensagem.length > 16 ? n.mensagem.slice(0, 15) + "…" : n.mensagem;
+      item.msg.textContent = n.mensagem.length > 12 ? n.mensagem.slice(0, 11) + "…" : n.mensagem;
       item.titulo.textContent = n.id + " — " + n.mensagem;
     });
 
@@ -983,7 +1036,7 @@ input[type="text"]:focus, select:focus {
       }
 
       var rotulo = e.emoji + " " + e.nome;
-      var largura = 22 + rotulo.length * 9.5;
+      var largura = e.larguraPilula;
 
       item.g.setAttribute("transform", "translate(" + e.x + "," + e.y + ")");
 
@@ -1076,6 +1129,18 @@ input[type="text"]:focus, select:focus {
       // do zero.
       if (!estado || !estado.branches || !estado.HEAD ||
           !estado.historico || !estado.devs || !estado.commits) return null;
+
+      // Coerência: o HEAD precisa apontar para uma branch que realmente existe
+      // e proximoId precisa ser o número que as próximas operações vão usar.
+      // Sem isto, um localStorage de uma versão antiga passa pelo guard acima
+      // e só quebra depois, dentro de pintarBarra, com a tela em branco e
+      // nenhuma pista fora do DevTools.
+      var branchExiste = false;
+      for (var i = 0; i < estado.branches.length; i++) {
+        if (estado.branches[i].nome === estado.HEAD.branch) { branchExiste = true; break; }
+      }
+      if (!branchExiste || typeof estado.proximoId !== "number") return null;
+
       return estado;
     } catch (err) {
       return null;
@@ -1116,6 +1181,10 @@ input[type="text"]:focus, select:focus {
 (function (raiz) {
   "use strict";
 
+  // Guardado aqui (em vez de mudar a assinatura de atualizar/pintarEquipe) porque
+  // montar() já é o único lugar que recebe o callback vindo de main.js.
+  var acaoAoExecutar = null;
+
   function pegar(id) { return document.getElementById(id); }
 
   function opcao(valor, rotulo) {
@@ -1155,6 +1224,8 @@ input[type="text"]:focus, select:focus {
   }
 
   function montar(aoExecutar) {
+    acaoAoExecutar = aoExecutar;
+
     pegar("btn-commit").addEventListener("click", function () {
       aoExecutar("commit", { mensagem: pegar("msg-commit").value });
     });
@@ -1205,7 +1276,8 @@ input[type="text"]:focus, select:focus {
     criarBranch: "erro-branch",
     checkout: "erro-checkout",
     merge: "erro-merge",
-    reset: "erro-reset"
+    reset: "erro-reset",
+    editarDev: "erro-branch"
   };
 
   function mostrarErro(nomeAcao, mensagem) {
@@ -1243,13 +1315,100 @@ input[type="text"]:focus, select:focus {
       var div = document.createElement("div");
       div.className = "dev" + (estado.HEAD.branch === br.nome ? " ativo" : "");
       div.style.borderLeftColor = br.cor;
-      div.appendChild(span("dev-emoji", dono ? dono.emoji : "🧑‍💻"));
+      div.title = "Clique para renomear";
+      div.style.cursor = "pointer";
 
-      var bloco = document.createElement("span");
-      bloco.appendChild(span("dev-nome", dono ? dono.nome : "Dev"));
-      bloco.appendChild(document.createElement("br"));
-      bloco.appendChild(span("dev-branch", br.nome));
-      div.appendChild(bloco);
+      function pintarConteudo() {
+        div.textContent = "";
+        div.appendChild(span("dev-emoji", dono ? dono.emoji : "🧑‍💻"));
+        var bloco = document.createElement("span");
+        bloco.appendChild(span("dev-nome", dono ? dono.nome : "Dev"));
+        bloco.appendChild(document.createElement("br"));
+        bloco.appendChild(span("dev-branch", br.nome));
+        div.appendChild(bloco);
+      }
+
+      function abrirEditor() {
+        div.classList.add("editando");
+        div.textContent = "";
+
+        var inputNome = document.createElement("input");
+        inputNome.type = "text";
+        inputNome.className = "dev-editar-nome";
+        inputNome.value = dono ? dono.nome : "";
+
+        var inputEmoji = document.createElement("input");
+        inputEmoji.type = "text";
+        inputEmoji.className = "dev-editar-emoji";
+        inputEmoji.maxLength = 4;
+        inputEmoji.value = dono ? dono.emoji : "";
+
+        var btnSalvar = document.createElement("button");
+        btnSalvar.type = "button";
+        btnSalvar.className = "dev-editar-salvar";
+        btnSalvar.textContent = "Salvar";
+
+        // Trava contra reentrância: salvar() e cancelar() disparam de vários
+        // eventos (Enter, clique no Salvar, Escape, sair do editor) e só o
+        // primeiro pode valer.
+        var resolvido = false;
+
+        function salvar() {
+          if (resolvido) return;
+          resolvido = true;
+          var ok = acaoAoExecutar("editarDev", { donoId: br.donoId, nome: inputNome.value, emoji: inputEmoji.value });
+          // Rejeitado (ex.: nome vazio): não há redesenho para destruir este
+          // editor, então solta a trava para o professor poder corrigir e
+          // tentar de novo em vez de ficar com a linha travada.
+          if (ok === false) resolvido = false;
+        }
+
+        function cancelar() {
+          if (resolvido) return;
+          resolvido = true;
+          div.classList.remove("editando");
+          pintarConteudo();
+        }
+
+        function teclado(ev) {
+          if (ev.key === "Enter") salvar();
+          else if (ev.key === "Escape") cancelar();
+        }
+        inputNome.addEventListener("keydown", teclado);
+        inputEmoji.addEventListener("keydown", teclado);
+
+        // mousedown, não click: dispara ANTES do campo em foco perder o foco.
+        // Com click, o blur fecharia o editor primeiro e o clique no Salvar
+        // nunca chegaria a valer.
+        btnSalvar.addEventListener("mousedown", function (ev) {
+          ev.preventDefault();
+          salvar();
+        });
+
+        // focusout (não blur) para poder checar PARA ONDE o foco foi: alternar
+        // entre nome e emoji com Tab não pode fechar o editor, só sair dele
+        // por completo conta como "blur sem mudança" e cancela.
+        div.addEventListener("focusout", function (ev) {
+          if (resolvido) return;
+          if (ev.relatedTarget && div.contains(ev.relatedTarget)) return;
+          cancelar();
+        });
+
+        div.appendChild(inputNome);
+        div.appendChild(inputEmoji);
+        div.appendChild(btnSalvar);
+        inputNome.focus();
+        inputNome.select();
+      }
+
+      pintarConteudo();
+
+      div.addEventListener("click", function () {
+        // Sem isto, clicar dentro do próprio input (para posicionar o cursor)
+        // borbulharia até aqui e reabriria o editor por cima dele mesmo.
+        if (div.classList.contains("editando")) return;
+        abrirEditor();
+      });
 
       painel.appendChild(div);
     });
@@ -1321,12 +1480,17 @@ input[type="text"]:focus, select:focus {
   "use strict";
 
   var estado = null;
+  var ultimoCommitVisto = null;
 
-  var ESCALA_MINIMA = 0.55; // abaixo disso o texto fica ilegível no projetor
+  var ESCALA_MINIMA = 0.7; // abaixo disso o texto para de ser legível do fundo da sala
+
+  function commitMaisRecente(e) {
+    return e.commits.length > 0 ? e.commits[e.commits.length - 1].id : null;
+  }
 
   // Recebe as dimensões que Graph.desenhar REALMENTE usou, não as do layout:
   // quando há etiquetas acima de y=0, a altura desenhada é maior que layout.altura.
-  function ajustarZoom(dims) {
+  function ajustarZoom(dims, deveRolar) {
     var area = document.querySelector(".area-grafo");
     var svg = document.getElementById("grafo");
     var disponivel = area.clientWidth - 40;
@@ -1340,20 +1504,30 @@ input[type="text"]:focus, select:focus {
     svg.style.marginBottom = (dims.altura * (escala - 1)) + "px";
     svg.style.marginRight = (dims.largura * (escala - 1)) + "px";
 
-    // Acompanha o commit mais recente.
-    area.scrollLeft = area.scrollWidth;
+    // Acompanha o commit mais recente — mas só quando ele de fato mudou. Um
+    // checkout para uma branch com a ponta lá atrás, um desfazer ou um resize
+    // não podem jogar a vista inteira para a direita.
+    if (deveRolar) area.scrollLeft = area.scrollWidth;
   }
 
   function redesenhar() {
     UI.atualizar(estado);
-    ajustarZoom(Graph.desenhar(Layout.calcular(estado)));
+    var commitAtual = commitMaisRecente(estado);
+    var mudouCommit = commitAtual !== ultimoCommitVisto;
+    ajustarZoom(Graph.desenhar(Layout.calcular(estado)), mudouCommit);
+    ultimoCommitVisto = commitAtual;
     document.getElementById("btn-desfazer").disabled = !Storage.podeDesfazer();
   }
 
+  // Devolve se deu certo. main.js é o único que usa isto para decidir o próximo
+  // passo (checkout, commit, etc. ignoram); o editor inline do painel EQUIPE em
+  // ui.js usa para saber se pode se destruir ou se precisa continuar aberto
+  // depois de um erro (ex.: nome vazio) — sem isto, um editarDev rejeitado
+  // travava o editor porque a trava contra reenvio nunca soltava.
   function aplicar(nomeAcao, resultado) {
     if (!resultado.ok) {
       UI.mostrarErro(nomeAcao, resultado.erro);
-      return;
+      return false;
     }
     Storage.empilhar(estado);
     estado = resultado.estado;
@@ -1361,6 +1535,7 @@ input[type="text"]:focus, select:focus {
     UI.limparCampos(nomeAcao);
     if (resultado.aviso) UI.mostrarAviso(resultado.aviso);
     redesenhar();
+    return true;
   }
 
   function executar(nomeAcao, p) {
@@ -1371,6 +1546,7 @@ input[type="text"]:focus, select:focus {
     if (nomeAcao === "checkout") return aplicar(nomeAcao, Repo.checkout(estado, p.nome));
     if (nomeAcao === "merge") return aplicar(nomeAcao, Repo.merge(estado, p.nome));
     if (nomeAcao === "reset") return aplicar(nomeAcao, Repo.reset(estado, p.commitId));
+    if (nomeAcao === "editarDev") return aplicar(nomeAcao, Repo.editarDev(estado, p.donoId, p.nome, p.emoji));
   }
 
   function desfazer() {

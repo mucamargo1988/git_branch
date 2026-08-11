@@ -1,6 +1,10 @@
 (function (raiz) {
   "use strict";
 
+  // Guardado aqui (em vez de mudar a assinatura de atualizar/pintarEquipe) porque
+  // montar() já é o único lugar que recebe o callback vindo de main.js.
+  var acaoAoExecutar = null;
+
   function pegar(id) { return document.getElementById(id); }
 
   function opcao(valor, rotulo) {
@@ -40,6 +44,8 @@
   }
 
   function montar(aoExecutar) {
+    acaoAoExecutar = aoExecutar;
+
     pegar("btn-commit").addEventListener("click", function () {
       aoExecutar("commit", { mensagem: pegar("msg-commit").value });
     });
@@ -90,7 +96,8 @@
     criarBranch: "erro-branch",
     checkout: "erro-checkout",
     merge: "erro-merge",
-    reset: "erro-reset"
+    reset: "erro-reset",
+    editarDev: "erro-branch"
   };
 
   function mostrarErro(nomeAcao, mensagem) {
@@ -128,13 +135,100 @@
       var div = document.createElement("div");
       div.className = "dev" + (estado.HEAD.branch === br.nome ? " ativo" : "");
       div.style.borderLeftColor = br.cor;
-      div.appendChild(span("dev-emoji", dono ? dono.emoji : "🧑‍💻"));
+      div.title = "Clique para renomear";
+      div.style.cursor = "pointer";
 
-      var bloco = document.createElement("span");
-      bloco.appendChild(span("dev-nome", dono ? dono.nome : "Dev"));
-      bloco.appendChild(document.createElement("br"));
-      bloco.appendChild(span("dev-branch", br.nome));
-      div.appendChild(bloco);
+      function pintarConteudo() {
+        div.textContent = "";
+        div.appendChild(span("dev-emoji", dono ? dono.emoji : "🧑‍💻"));
+        var bloco = document.createElement("span");
+        bloco.appendChild(span("dev-nome", dono ? dono.nome : "Dev"));
+        bloco.appendChild(document.createElement("br"));
+        bloco.appendChild(span("dev-branch", br.nome));
+        div.appendChild(bloco);
+      }
+
+      function abrirEditor() {
+        div.classList.add("editando");
+        div.textContent = "";
+
+        var inputNome = document.createElement("input");
+        inputNome.type = "text";
+        inputNome.className = "dev-editar-nome";
+        inputNome.value = dono ? dono.nome : "";
+
+        var inputEmoji = document.createElement("input");
+        inputEmoji.type = "text";
+        inputEmoji.className = "dev-editar-emoji";
+        inputEmoji.maxLength = 4;
+        inputEmoji.value = dono ? dono.emoji : "";
+
+        var btnSalvar = document.createElement("button");
+        btnSalvar.type = "button";
+        btnSalvar.className = "dev-editar-salvar";
+        btnSalvar.textContent = "Salvar";
+
+        // Trava contra reentrância: salvar() e cancelar() disparam de vários
+        // eventos (Enter, clique no Salvar, Escape, sair do editor) e só o
+        // primeiro pode valer.
+        var resolvido = false;
+
+        function salvar() {
+          if (resolvido) return;
+          resolvido = true;
+          var ok = acaoAoExecutar("editarDev", { donoId: br.donoId, nome: inputNome.value, emoji: inputEmoji.value });
+          // Rejeitado (ex.: nome vazio): não há redesenho para destruir este
+          // editor, então solta a trava para o professor poder corrigir e
+          // tentar de novo em vez de ficar com a linha travada.
+          if (ok === false) resolvido = false;
+        }
+
+        function cancelar() {
+          if (resolvido) return;
+          resolvido = true;
+          div.classList.remove("editando");
+          pintarConteudo();
+        }
+
+        function teclado(ev) {
+          if (ev.key === "Enter") salvar();
+          else if (ev.key === "Escape") cancelar();
+        }
+        inputNome.addEventListener("keydown", teclado);
+        inputEmoji.addEventListener("keydown", teclado);
+
+        // mousedown, não click: dispara ANTES do campo em foco perder o foco.
+        // Com click, o blur fecharia o editor primeiro e o clique no Salvar
+        // nunca chegaria a valer.
+        btnSalvar.addEventListener("mousedown", function (ev) {
+          ev.preventDefault();
+          salvar();
+        });
+
+        // focusout (não blur) para poder checar PARA ONDE o foco foi: alternar
+        // entre nome e emoji com Tab não pode fechar o editor, só sair dele
+        // por completo conta como "blur sem mudança" e cancela.
+        div.addEventListener("focusout", function (ev) {
+          if (resolvido) return;
+          if (ev.relatedTarget && div.contains(ev.relatedTarget)) return;
+          cancelar();
+        });
+
+        div.appendChild(inputNome);
+        div.appendChild(inputEmoji);
+        div.appendChild(btnSalvar);
+        inputNome.focus();
+        inputNome.select();
+      }
+
+      pintarConteudo();
+
+      div.addEventListener("click", function () {
+        // Sem isto, clicar dentro do próprio input (para posicionar o cursor)
+        // borbulharia até aqui e reabriria o editor por cima dele mesmo.
+        if (div.classList.contains("editando")) return;
+        abrirEditor();
+      });
 
       painel.appendChild(div);
     });
