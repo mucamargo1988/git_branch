@@ -24,6 +24,10 @@ Para levar em pendrive ou mandar para os alunos, use `branches-na-pratica.html` 
 
 Todo comando executado aparece numerado no painel da direita.
 
+As duas barras laterais são ajustáveis: arraste a linha que separa cada uma do
+grafo, ou dê Tab até ela e use as setas. Duplo clique volta à largura original.
+O grafo nunca fica menor que as barras.
+
 O app **não** simula conflitos de merge: todo merge dá certo. Ele também é só Git
 local — não há push, pull nem Pull Request.
 

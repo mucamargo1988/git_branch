@@ -62,8 +62,10 @@ body {
 /* ---------- colunas ---------- */
 
 .colunas {
+  --col-esq: 300px;
+  --col-dir: 320px;
   display: grid;
-  grid-template-columns: 300px 1fr 320px;
+  grid-template-columns: var(--col-esq) 8px 1fr 8px var(--col-dir);
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -73,8 +75,6 @@ body {
   padding: 16px;
   background: var(--fundo-painel);
 }
-.coluna-esquerda { border-right: 2px solid var(--borda); }
-.coluna-direita { border-left: 2px solid var(--borda); }
 
 .coluna-centro {
   display: flex;
@@ -82,6 +82,27 @@ body {
   min-width: 0;
   min-height: 0;
 }
+
+/* ---------- divisórias ---------- */
+
+.divisoria {
+  background: var(--borda);
+  cursor: col-resize;
+  /* Sem isto o navegador trata o arraste como rolagem da página e o gesto
+     nunca chega ao JS — quebra em lousa digital e em tela sensível ao toque. */
+  touch-action: none;
+}
+.divisoria:hover, .divisoria.arrastando { background: var(--destaque); }
+/* Uma faixa de 8px sem foco visível é impossível de operar por teclado.
+   outline-offset negativo mantém o traço dentro da faixa em vez de invadir
+   os painéis vizinhos. */
+.divisoria:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; }
+
+/* Durante o arraste o cursor precisa valer para a página inteira: preso só à
+   divisória, ele voltaria a ser seta assim que o ponteiro passasse por cima do
+   grafo, no meio do próprio gesto. user-select impede que o arraste vá
+   selecionando o texto dos painéis pelo caminho. */
+body.redimensionando { cursor: col-resize; user-select: none; }
 
 h2 {
   font-size: 13px;
@@ -266,6 +287,44 @@ input[type="text"]:focus, select:focus {
   font-size: 13px; font-weight: 800; fill: var(--texto); dominant-baseline: central;
 }
 
+/* ---------- barras de rolagem ---------- */
+
+/* Discretas de propósito: num projetor, uma barra larga e clara rouba atenção do
+   grafo, que é o objeto da aula. Fina, sem trilha visível, e com contraste maior
+   só quando o cursor chega perto. Discreta, não invisível — sumir por completo
+   esconderia do professor que o painel rola. */
+.coluna-esquerda, .coluna-direita, .area-grafo {
+  scrollbar-width: thin;
+  scrollbar-color: var(--borda) transparent;
+}
+
+/* As duas de cima só valem em Firefox e Chrome recente. Sem este bloco, Safari e
+   Chrome mais antigo continuariam com a barra cinza-clara do sistema — que é
+   exatamente o que queremos evitar. */
+.coluna-esquerda::-webkit-scrollbar,
+.coluna-direita::-webkit-scrollbar,
+.area-grafo::-webkit-scrollbar { width: 9px; height: 9px; }
+
+.coluna-esquerda::-webkit-scrollbar-track,
+.coluna-direita::-webkit-scrollbar-track,
+.area-grafo::-webkit-scrollbar-track { background: transparent; }
+
+.coluna-esquerda::-webkit-scrollbar-thumb,
+.coluna-direita::-webkit-scrollbar-thumb,
+.area-grafo::-webkit-scrollbar-thumb {
+  background: var(--borda);
+  border-radius: 6px;
+}
+
+.coluna-esquerda::-webkit-scrollbar-thumb:hover,
+.coluna-direita::-webkit-scrollbar-thumb:hover,
+.area-grafo::-webkit-scrollbar-thumb:hover { background: var(--texto-apagado); }
+
+/* O quadradinho onde as barras horizontal e vertical se encontram, só na área do
+   grafo. Sem isto ele fica com o cinza padrão e denuncia a barra que acabamos de
+   discretizar. */
+.area-grafo::-webkit-scrollbar-corner { background: transparent; }
+
 @media (prefers-reduced-motion: reduce) {
   .aresta, .no, .etiqueta { transition: none; }
 }
@@ -337,6 +396,10 @@ input[type="text"]:focus, select:focus {
     </section>
   </aside>
 
+  <div class="divisoria" id="divisoria-esq"
+       role="separator" aria-orientation="vertical" tabindex="0"
+       aria-label="Ajustar largura do painel da esquerda"></div>
+
   <section class="coluna-centro">
     <div id="avisos"></div>
     <div class="area-grafo">
@@ -344,6 +407,10 @@ input[type="text"]:focus, select:focus {
       <svg id="grafo" xmlns="http://www.w3.org/2000/svg"></svg>
     </div>
   </section>
+
+  <div class="divisoria" id="divisoria-dir"
+       role="separator" aria-orientation="vertical" tabindex="0"
+       aria-label="Ajustar largura do painel da direita"></div>
 
   <aside class="coluna-direita">
     <h2>Histórico</h2>
@@ -1233,6 +1300,26 @@ input[type="text"]:focus, select:focus {
   // montar() já é o único lugar que recebe o callback vindo de main.js.
   var acaoAoExecutar = null;
 
+  // Cada barra lateral se limita SOZINHA a 30% da janela, com um piso de 220px que
+  // CEDE quando a janela é muito estreita. Como as duas juntas nunca passam de 60%,
+  // o miolo é sempre a maior coluna em qualquer janela acima de ~160px — aritmética,
+  // sem precisar comparar uma barra com a outra.
+  var LARGURA_MINIMA = 220;   // abaixo disto o campo de nome + emoji do painel Ações quebra
+  var FRACAO_MAXIMA = 0.30;
+
+  function clampLargura(desejada, larguraJanela) {
+    // Sem uma janela válida não há teto a calcular.
+    if (typeof larguraJanela !== "number" || !isFinite(larguraJanela)) return LARGURA_MINIMA;
+    var teto = larguraJanela * FRACAO_MAXIMA;
+    // O piso CEDE quando a janela é estreita demais para bancá-lo. Travar as duas
+    // barras em 220px numa janela de 600px deixaria o miolo com 144px — menor que
+    // elas, quebrando a única promessa da feature. Cedendo junto, as duas ficam em
+    // 30% e o miolo continua com ~40%.
+    var piso = Math.min(LARGURA_MINIMA, teto);
+    if (typeof desejada !== "number" || !isFinite(desejada)) return piso;
+    return Math.max(piso, Math.min(desejada, teto));
+  }
+
   function pegar(id) { return document.getElementById(id); }
 
   function opcao(valor, rotulo) {
@@ -1301,6 +1388,97 @@ input[type="text"]:focus, select:focus {
     pegar("btn-reset").addEventListener("click", function () {
       aoExecutar("reset", { commitId: pegar("sel-reset").value });
     });
+  }
+
+  var PADRAO_ESQ = 300;
+  var PADRAO_DIR = 320;
+  var PASSO_TECLADO = 16;
+
+  function configurarDivisoria(alca, variavel, padrao, ehEsquerda, colunas, aoRedimensionar) {
+    var pendente = false;
+    var deslocamento = 0;
+
+    // Distância do cursor até a borda externa da janela do lado desta barra.
+    function larguraCrua(clientX) {
+      var caixa = colunas.getBoundingClientRect();
+      return ehEsquerda ? clientX - caixa.left : caixa.right - clientX;
+    }
+
+    function larguraAtual() {
+      var valor = parseFloat(getComputedStyle(colunas).getPropertyValue(variavel));
+      return isFinite(valor) ? valor : padrao;
+    }
+
+    function aplicar(desejada) {
+      colunas.style.setProperty(variavel, clampLargura(desejada, window.innerWidth) + "px");
+      // Um arraste dispara dezenas de pointermove por segundo. Uma vez por
+      // quadro basta para o grafo parecer colado na divisória.
+      if (pendente) return;
+      pendente = true;
+      requestAnimationFrame(function () {
+        pendente = false;
+        aoRedimensionar();
+      });
+    }
+
+    alca.addEventListener("pointerdown", function (ev) {
+      ev.preventDefault();
+      // Sem captura, um arraste rápido tira o cursor da faixa de 8px antes do
+      // próximo evento e o gesto "escapa" no meio do caminho.
+      alca.setPointerCapture(ev.pointerId);
+      alca.classList.add("arrastando");
+      document.body.classList.add("redimensionando");
+      // Guarda onde dentro da faixa o professor pegou, para a borda não pular
+      // até o cursor no primeiro pixel de movimento.
+      deslocamento = larguraAtual() - larguraCrua(ev.clientX);
+    });
+
+    alca.addEventListener("pointermove", function (ev) {
+      if (!alca.hasPointerCapture(ev.pointerId)) return;
+      aplicar(larguraCrua(ev.clientX) + deslocamento);
+    });
+
+    function soltar(ev) {
+      if (alca.hasPointerCapture(ev.pointerId)) alca.releasePointerCapture(ev.pointerId);
+      alca.classList.remove("arrastando");
+      document.body.classList.remove("redimensionando");
+    }
+    alca.addEventListener("pointerup", soltar);
+    alca.addEventListener("pointercancel", soltar);
+
+    alca.addEventListener("dblclick", function () { aplicar(padrao); });
+
+    alca.addEventListener("keydown", function (ev) {
+      // Na barra da direita, mover a divisória para a direita ESTREITA a barra.
+      // O sinal invertido é o que faz a seta concordar com o que se vê.
+      var passo = ehEsquerda ? PASSO_TECLADO : -PASSO_TECLADO;
+      if (ev.key === "ArrowRight") aplicar(larguraAtual() + passo);
+      else if (ev.key === "ArrowLeft") aplicar(larguraAtual() - passo);
+      else if (ev.key === "Home") aplicar(0);                    // clampLargura leva ao mínimo
+      else if (ev.key === "End") aplicar(window.innerWidth);     // clampLargura leva ao máximo
+      else return;
+      ev.preventDefault();
+    });
+
+    // Devolve um jeito de reaplicar o limite sobre a largura atual, sem mexer nela
+    // de propósito. Quem chama: a abertura da página e o resize da janela.
+    return function () { aplicar(larguraAtual()); };
+  }
+
+  function montarDivisorias(aoRedimensionar) {
+    var colunas = document.querySelector(".colunas");
+    var reancorarEsq = configurarDivisoria(pegar("divisoria-esq"), "--col-esq", PADRAO_ESQ, true, colunas, aoRedimensionar);
+    var reancorarDir = configurarDivisoria(pegar("divisoria-dir"), "--col-dir", PADRAO_DIR, false, colunas, aoRedimensionar);
+
+    // As larguras padrão não passam pelo clamp sozinhas. Numa janela de 800px,
+    // 300 + 320 + 16 deixa o miolo com 164px — menor que as duas barras, logo na
+    // abertura e antes de qualquer arraste. O mesmo vale quando o professor
+    // estreita a janela depois: o valor em px guardado continua sendo o antigo.
+    // Sem estas duas chamadas a promessa da feature só passa a valer depois do
+    // primeiro arraste.
+    function reancorar() { reancorarEsq(); reancorarDir(); }
+    reancorar();
+    window.addEventListener("resize", reancorar);
   }
 
   function limparCampos(nomeAcao) {
@@ -1518,7 +1696,9 @@ input[type="text"]:focus, select:focus {
     limparCampos: limparCampos,
     limparErros: limparErros,
     mostrarErro: mostrarErro,
-    mostrarAviso: mostrarAviso
+    mostrarAviso: mostrarAviso,
+    clampLargura: clampLargura,
+    montarDivisorias: montarDivisorias
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
 
@@ -1529,6 +1709,7 @@ input[type="text"]:focus, select:focus {
 
   var estado = null;
   var ultimoCommitVisto = null;
+  var ultimasDims = null;
 
   var ESCALA_MINIMA = 0.7; // abaixo disso o texto para de ser legível do fundo da sala
 
@@ -1562,9 +1743,18 @@ input[type="text"]:focus, select:focus {
     UI.atualizar(estado);
     var commitAtual = commitMaisRecente(estado);
     var mudouCommit = commitAtual !== ultimoCommitVisto;
-    ajustarZoom(Graph.desenhar(Layout.calcular(estado)), mudouCommit);
+    ultimasDims = Graph.desenhar(Layout.calcular(estado));
+    ajustarZoom(ultimasDims, mudouCommit);
     ultimoCommitVisto = commitAtual;
     document.getElementById("btn-desfazer").disabled = !Storage.podeDesfazer();
+  }
+
+  // Arrastar uma divisória muda a largura da coluna do meio sem disparar resize
+  // nenhum. Só a ESCALA precisa ser refeita: Layout.calcular depende do estado
+  // do repositório, não do tamanho da tela. Nunca rola a vista — arrastar não é
+  // uma ação nova do professor.
+  function reajustar() {
+    if (ultimasDims) ajustarZoom(ultimasDims, false);
   }
 
   // Devolve se deu certo. main.js é o único que usa isto para decidir o próximo
@@ -1619,6 +1809,7 @@ input[type="text"]:focus, select:focus {
     estado = Storage.carregar() || Repo.estadoInicial();
     Graph.montar(document.getElementById("grafo"));
     UI.montar(executar);
+    UI.montarDivisorias(reajustar);
     document.getElementById("btn-desfazer").addEventListener("click", desfazer);
     document.getElementById("btn-reiniciar").addEventListener("click", reiniciar);
     window.addEventListener("resize", function () { redesenhar(); });
