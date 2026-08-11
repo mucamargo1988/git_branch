@@ -2,6 +2,7 @@ if (typeof require !== "undefined") {
   require("./mini-teste.js");
   require("./repo.js");
   require("./layout.js");
+  require("./ui.js");
 }
 
 var teste = MiniTeste.teste;
@@ -567,6 +568,51 @@ teste("dois nomes um ponto: etiquetas seguem empilhadas quando nada veio depois"
   verdade(l.etiquetas[0].y !== l.etiquetas[1].y, "empilhadas, nao sobrepostas");
   verdade(Math.abs(l.etiquetas[0].y - l.etiquetas[1].y) < Layout.ESPACO_Y / 2,
     "as duas continuam juntas no mesmo commit");
+});
+
+// ---------- ui.js: largura das barras laterais ----------
+
+teste("clampLargura deixa passar um valor no meio da faixa", function () {
+  igual(UI.clampLargura(300, 1920), 300, "1920px de janela dá teto de 576px");
+});
+
+teste("clampLargura sobe qualquer valor abaixo do piso de 220", function () {
+  igual(UI.clampLargura(150, 1920), 220);
+  igual(UI.clampLargura(0, 1920), 220);
+  igual(UI.clampLargura(-500, 1920), 220, "arrastar para fora da tela não vira negativo");
+});
+
+teste("clampLargura desce qualquer valor acima de 30% da janela", function () {
+  igual(UI.clampLargura(900, 1000), 300, "30% de 1000 é 300");
+  igual(UI.clampLargura(1e9, 1000), 300, "arrastar para o infinito trava no teto");
+});
+
+teste("clampLargura: em tela estreita o piso vence o teto", function () {
+  // 30% de 700 é 210, abaixo do piso de 220. Os limites se cruzam e o piso
+  // ganha — a barra trava em 220 e deixa de ser redimensionável, que é
+  // exatamente o comportamento de hoje.
+  igual(UI.clampLargura(400, 700), 220);
+  igual(UI.clampLargura(100, 700), 220);
+});
+
+teste("clampLargura nunca devolve NaN", function () {
+  igual(UI.clampLargura(NaN, 1920), 220);
+  igual(UI.clampLargura(undefined, 1920), 220);
+  igual(UI.clampLargura(Infinity, 1920), 220);
+  igual(UI.clampLargura("300", 1920), 220, "string não conta como número");
+});
+
+teste("clampLargura garante o miolo maior que qualquer barra", function () {
+  // A propriedade que a feature inteira existe para preservar. Se as duas
+  // barras estão no máximo permitido, o que sobra para o miolo (descontadas
+  // as duas divisórias de 8px) ainda precisa ser maior que cada uma delas.
+  [1000, 1280, 1366, 1920, 2560, 3840].forEach(function (janela) {
+    var esq = UI.clampLargura(1e9, janela);
+    var dir = UI.clampLargura(1e9, janela);
+    var miolo = janela - esq - dir - 16;
+    verdade(miolo > esq, "janela " + janela + ": miolo " + miolo + " deve superar " + esq);
+    verdade(miolo > dir, "janela " + janela + ": miolo " + miolo + " deve superar " + dir);
+  });
 });
 
 // ---------- executor no Node ----------
