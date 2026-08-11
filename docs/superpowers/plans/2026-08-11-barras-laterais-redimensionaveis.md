@@ -556,9 +556,29 @@ git commit -m "Deixa as barras de rolagem discretas"
 - Consumes: a feature completa das Tasks 1-4.
 - Produces: nada de código.
 
-- [ ] **Step 1: Verificar o arraste com Playwright**
+- [x] **Step 1: Verificar o arraste com Playwright — JÁ EXECUTADO pelo controlador**
 
-**Duas restrições do ambiente, ambas já verificadas nesta sessão — respeite as duas ou o teste falha por artefato, não por defeito do código:**
+Este step está feito. O controlador rodou as checagens no navegador com injeção real de ponteiro (`page.mouse`), sobre a versão em pasta, e obteve:
+
+| Checagem | Resultado |
+|---|---|
+| Arraste, janela 1280 | esquerda 300 → 384px; miolo 644 → 560px |
+| `reajustar` correu | `transform` do `#grafo` foi de `scale(1)` a `scale(0.88061)` |
+| Trava no teto | 384px, exatamente 30% de 1280 |
+| Miolo continua o maior | 560 > 384 e > 320 |
+| `body.redimensionando` | `true` durante o arraste, `false` depois |
+| Duplo clique | volta a 300px e `scale(1)`, sem mexer na direita |
+| Teclado, esquerda | 300 → 284 → 300; `Home` → 220; `End` → 384 |
+| Teclado, direita | 320 → 304 (`ArrowRight` estreita, sinal correto) |
+| Reancoragem, abertura 800px | 240/304/240 — sem ela seria 300/**164**/320 |
+| Reancoragem, abertura 600px | 180/224/180 — o piso cedeu |
+| Reancoragem, resize 1600→700 | 300/320 vira 210/210, miolo 264 |
+
+Piso de 220px conferido a olho por screenshot: o painel Ações segue legível, `.dupla` não quebra (nome 104px + emoji 68px na mesma linha).
+
+**Não repita estas checagens na versão em pasta.** O que falta verificar é o **arquivo único** — Step 4 — que é o artefato que vai para os alunos e o único estado ainda não exercitado.
+
+As duas restrições do ambiente abaixo valem para o Step 4. Respeite as duas ou o teste falha por artefato, não por defeito do código:
 
 1. **`file://` está bloqueado no navegador controlado.** Use o servidor estático local em `http://localhost:8321` (o script está em `scratchpad/servidor.js`; ele serve a pasta do projeto, inclusive `branches-na-pratica.html`).
 
