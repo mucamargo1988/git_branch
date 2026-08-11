@@ -95,6 +95,97 @@
     });
   }
 
+  var PADRAO_ESQ = 300;
+  var PADRAO_DIR = 320;
+  var PASSO_TECLADO = 16;
+
+  function configurarDivisoria(alca, variavel, padrao, ehEsquerda, colunas, aoRedimensionar) {
+    var pendente = false;
+    var deslocamento = 0;
+
+    // Distância do cursor até a borda externa da janela do lado desta barra.
+    function larguraCrua(clientX) {
+      var caixa = colunas.getBoundingClientRect();
+      return ehEsquerda ? clientX - caixa.left : caixa.right - clientX;
+    }
+
+    function larguraAtual() {
+      var valor = parseFloat(getComputedStyle(colunas).getPropertyValue(variavel));
+      return isFinite(valor) ? valor : padrao;
+    }
+
+    function aplicar(desejada) {
+      colunas.style.setProperty(variavel, clampLargura(desejada, window.innerWidth) + "px");
+      // Um arraste dispara dezenas de pointermove por segundo. Uma vez por
+      // quadro basta para o grafo parecer colado na divisória.
+      if (pendente) return;
+      pendente = true;
+      requestAnimationFrame(function () {
+        pendente = false;
+        aoRedimensionar();
+      });
+    }
+
+    alca.addEventListener("pointerdown", function (ev) {
+      ev.preventDefault();
+      // Sem captura, um arraste rápido tira o cursor da faixa de 8px antes do
+      // próximo evento e o gesto "escapa" no meio do caminho.
+      alca.setPointerCapture(ev.pointerId);
+      alca.classList.add("arrastando");
+      document.body.classList.add("redimensionando");
+      // Guarda onde dentro da faixa o professor pegou, para a borda não pular
+      // até o cursor no primeiro pixel de movimento.
+      deslocamento = larguraAtual() - larguraCrua(ev.clientX);
+    });
+
+    alca.addEventListener("pointermove", function (ev) {
+      if (!alca.hasPointerCapture(ev.pointerId)) return;
+      aplicar(larguraCrua(ev.clientX) + deslocamento);
+    });
+
+    function soltar(ev) {
+      if (alca.hasPointerCapture(ev.pointerId)) alca.releasePointerCapture(ev.pointerId);
+      alca.classList.remove("arrastando");
+      document.body.classList.remove("redimensionando");
+    }
+    alca.addEventListener("pointerup", soltar);
+    alca.addEventListener("pointercancel", soltar);
+
+    alca.addEventListener("dblclick", function () { aplicar(padrao); });
+
+    alca.addEventListener("keydown", function (ev) {
+      // Na barra da direita, mover a divisória para a direita ESTREITA a barra.
+      // O sinal invertido é o que faz a seta concordar com o que se vê.
+      var passo = ehEsquerda ? PASSO_TECLADO : -PASSO_TECLADO;
+      if (ev.key === "ArrowRight") aplicar(larguraAtual() + passo);
+      else if (ev.key === "ArrowLeft") aplicar(larguraAtual() - passo);
+      else if (ev.key === "Home") aplicar(0);                    // clampLargura leva ao mínimo
+      else if (ev.key === "End") aplicar(window.innerWidth);     // clampLargura leva ao máximo
+      else return;
+      ev.preventDefault();
+    });
+
+    // Devolve um jeito de reaplicar o limite sobre a largura atual, sem mexer nela
+    // de propósito. Quem chama: a abertura da página e o resize da janela.
+    return function () { aplicar(larguraAtual()); };
+  }
+
+  function montarDivisorias(aoRedimensionar) {
+    var colunas = document.querySelector(".colunas");
+    var reancorarEsq = configurarDivisoria(pegar("divisoria-esq"), "--col-esq", PADRAO_ESQ, true, colunas, aoRedimensionar);
+    var reancorarDir = configurarDivisoria(pegar("divisoria-dir"), "--col-dir", PADRAO_DIR, false, colunas, aoRedimensionar);
+
+    // As larguras padrão não passam pelo clamp sozinhas. Numa janela de 800px,
+    // 300 + 320 + 16 deixa o miolo com 164px — menor que as duas barras, logo na
+    // abertura e antes de qualquer arraste. O mesmo vale quando o professor
+    // estreita a janela depois: o valor em px guardado continua sendo o antigo.
+    // Sem estas duas chamadas a promessa da feature só passa a valer depois do
+    // primeiro arraste.
+    function reancorar() { reancorarEsq(); reancorarDir(); }
+    reancorar();
+    window.addEventListener("resize", reancorar);
+  }
+
   function limparCampos(nomeAcao) {
     if (nomeAcao === "commit") pegar("msg-commit").value = "";
     if (nomeAcao === "criarBranch") {
@@ -311,6 +402,7 @@
     limparErros: limparErros,
     mostrarErro: mostrarErro,
     mostrarAviso: mostrarAviso,
-    clampLargura: clampLargura
+    clampLargura: clampLargura,
+    montarDivisorias: montarDivisorias
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);

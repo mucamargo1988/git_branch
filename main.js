@@ -3,6 +3,7 @@
 
   var estado = null;
   var ultimoCommitVisto = null;
+  var ultimasDims = null;
 
   var ESCALA_MINIMA = 0.7; // abaixo disso o texto para de ser legível do fundo da sala
 
@@ -36,9 +37,18 @@
     UI.atualizar(estado);
     var commitAtual = commitMaisRecente(estado);
     var mudouCommit = commitAtual !== ultimoCommitVisto;
-    ajustarZoom(Graph.desenhar(Layout.calcular(estado)), mudouCommit);
+    ultimasDims = Graph.desenhar(Layout.calcular(estado));
+    ajustarZoom(ultimasDims, mudouCommit);
     ultimoCommitVisto = commitAtual;
     document.getElementById("btn-desfazer").disabled = !Storage.podeDesfazer();
+  }
+
+  // Arrastar uma divisória muda a largura da coluna do meio sem disparar resize
+  // nenhum. Só a ESCALA precisa ser refeita: Layout.calcular depende do estado
+  // do repositório, não do tamanho da tela. Nunca rola a vista — arrastar não é
+  // uma ação nova do professor.
+  function reajustar() {
+    if (ultimasDims) ajustarZoom(ultimasDims, false);
   }
 
   // Devolve se deu certo. main.js é o único que usa isto para decidir o próximo
@@ -93,6 +103,7 @@
     estado = Storage.carregar() || Repo.estadoInicial();
     Graph.montar(document.getElementById("grafo"));
     UI.montar(executar);
+    UI.montarDivisorias(reajustar);
     document.getElementById("btn-desfazer").addEventListener("click", desfazer);
     document.getElementById("btn-reiniciar").addEventListener("click", reiniciar);
     window.addEventListener("resize", function () { redesenhar(); });
