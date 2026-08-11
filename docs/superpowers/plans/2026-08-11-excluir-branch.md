@@ -687,8 +687,12 @@ Expected: `branches-na-pratica.html gerado (NN KB)`. Este trabalho mexeu em `ind
 
 - [ ] **Step 5: Conferir que o arquivo único recebeu a feature**
 
-Run: `node -e "var h=require('fs').readFileSync('branches-na-pratica.html','utf8'); console.log(h.indexOf('excluirBranch') !== -1, h.indexOf('sel-excluir') !== -1, h.indexOf('<script src=\"') === -1);"`
-Expected: `true true true` — o JS entrou, o HTML entrou, e não sobrou referência externa.
+Run: `node -e "var h=require('fs').readFileSync('branches-na-pratica.html','utf8'); console.log(h.indexOf('excluirBranch') !== -1, h.indexOf('sel-excluir') !== -1);"`
+Expected: `true true` — o JS entrou e o HTML entrou.
+
+Só aspas simples dentro das duplas, de propósito: assim a linha roda igual no
+PowerShell e no Git Bash. Não é preciso checar se sobrou referência externa —
+`gerar-arquivo-unico.js` já falha com erro e código 1 se sobrar.
 
 - [ ] **Step 6: Abrir o arquivo único e apagar uma branch**
 
