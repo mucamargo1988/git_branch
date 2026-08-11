@@ -55,8 +55,10 @@ body {
 /* ---------- colunas ---------- */
 
 .colunas {
+  --col-esq: 300px;
+  --col-dir: 320px;
   display: grid;
-  grid-template-columns: 300px 1fr 320px;
+  grid-template-columns: var(--col-esq) 8px 1fr 8px var(--col-dir);
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -66,8 +68,6 @@ body {
   padding: 16px;
   background: var(--fundo-painel);
 }
-.coluna-esquerda { border-right: 2px solid var(--borda); }
-.coluna-direita { border-left: 2px solid var(--borda); }
 
 .coluna-centro {
   display: flex;
@@ -75,6 +75,27 @@ body {
   min-width: 0;
   min-height: 0;
 }
+
+/* ---------- divisórias ---------- */
+
+.divisoria {
+  background: var(--borda);
+  cursor: col-resize;
+  /* Sem isto o navegador trata o arraste como rolagem da página e o gesto
+     nunca chega ao JS — quebra em lousa digital e em tela sensível ao toque. */
+  touch-action: none;
+}
+.divisoria:hover, .divisoria.arrastando { background: var(--destaque); }
+/* Uma faixa de 8px sem foco visível é impossível de operar por teclado.
+   outline-offset negativo mantém o traço dentro da faixa em vez de invadir
+   os painéis vizinhos. */
+.divisoria:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; }
+
+/* Durante o arraste o cursor precisa valer para a página inteira: preso só à
+   divisória, ele voltaria a ser seta assim que o ponteiro passasse por cima do
+   grafo, no meio do próprio gesto. user-select impede que o arraste vá
+   selecionando o texto dos painéis pelo caminho. */
+body.redimensionando { cursor: col-resize; user-select: none; }
 
 h2 {
   font-size: 13px;
