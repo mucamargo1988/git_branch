@@ -2244,8 +2244,12 @@ porque as três peças não têm valor separadas: `storage` sem `main` não salv
       var bruto = localStorage.getItem(CHAVE);
       if (!bruto) return null;
       var estado = JSON.parse(bruto);
-      // Guarda contra um localStorage de versão antiga ou corrompido.
-      if (!estado || !estado.branches || !estado.HEAD || !estado.historico) return null;
+      // Guarda contra um localStorage de versão antiga ou corrompido. Confere os
+      // quatro campos que a tela lê logo no primeiro desenho — faltando qualquer
+      // um deles, o app quebraria em cima da aula em vez de simplesmente começar
+      // do zero.
+      if (!estado || !estado.branches || !estado.HEAD ||
+          !estado.historico || !estado.devs || !estado.commits) return null;
       return estado;
     } catch (err) {
       return null;
@@ -2378,32 +2382,56 @@ porque as três peças não têm valor separadas: `storage` sem `main` não salv
     pegar("avisos").appendChild(p);
   }
 
+  function acharDev(estado, donoId) {
+    for (var i = 0; i < estado.devs.length; i++) {
+      if (estado.devs[i].id === donoId) return estado.devs[i];
+    }
+    return null;
+  }
+
+  function span(classe, texto) {
+    var el = document.createElement("span");
+    if (classe) el.className = classe;
+    el.textContent = texto;
+    return el;
+  }
+
+  // Nomes de branch e de aluno são TEXTO digitado na hora, então entram por
+  // textContent, nunca por innerHTML. Não é preciosismo de segurança: uma branch
+  // chamada "feature/<algo>" simplesmente SUMIRIA da tela, porque o navegador
+  // leria o "<" como início de marcação. O professor digitaria um nome e ele
+  // desapareceria do projetor.
   function pintarBarra(estado) {
     var br = Repo.branchAtual(estado);
-    var dono = null;
-    for (var i = 0; i < estado.devs.length; i++) {
-      if (estado.devs[i].id === br.donoId) dono = estado.devs[i];
+    var dono = acharDev(estado, br.donoId);
+    var alvo = pegar("barra-head");
+
+    alvo.textContent = "HEAD → ";
+    var forte = document.createElement("strong");
+    forte.textContent = br.nome;
+    alvo.appendChild(forte);
+    if (dono) {
+      alvo.appendChild(document.createTextNode("  " + dono.emoji + " " + dono.nome));
     }
-    pegar("barra-head").innerHTML =
-      "HEAD → <strong>" + br.nome + "</strong> &nbsp; " +
-      (dono ? dono.emoji + " " + dono.nome : "");
   }
 
   function pintarEquipe(estado) {
     var painel = pegar("painel-equipe");
-    painel.innerHTML = "";
+    painel.textContent = "";
     estado.branches.forEach(function (br) {
-      var dono = null;
-      for (var i = 0; i < estado.devs.length; i++) {
-        if (estado.devs[i].id === br.donoId) dono = estado.devs[i];
-      }
+      var dono = acharDev(estado, br.donoId);
+
       var div = document.createElement("div");
       div.className = "dev" + (estado.HEAD.branch === br.nome ? " ativo" : "");
       div.style.borderLeftColor = br.cor;
-      div.innerHTML =
-        '<span class="dev-emoji">' + (dono ? dono.emoji : "🧑‍💻") + "</span>" +
-        '<span><span class="dev-nome">' + (dono ? dono.nome : "Dev") + "</span><br>" +
-        '<span class="dev-branch">' + br.nome + "</span></span>";
+      div.appendChild(span("dev-emoji", dono ? dono.emoji : "🧑‍💻"));
+
+      var bloco = document.createElement("span");
+      bloco.appendChild(span("dev-nome", dono ? dono.nome : "Dev"));
+      bloco.appendChild(document.createElement("br"));
+      bloco.appendChild(span("dev-branch", br.nome));
+      div.appendChild(bloco);
+
       painel.appendChild(div);
     });
   }
@@ -2550,8 +2578,8 @@ Abrir `index.html` com duplo clique e executar exatamente esta sequência:
 | 1 | Estado inicial | Dica "Repositório vazio", histórico com `1 git init`, `+ Branch` desabilitado |
 | 2 | Commit "c0" | Um círculo azul; etiqueta `master` grudada nele com `◀ HEAD`; `+ Branch` habilita |
 | 3 | Nova branch `feature/login`, dono `Ana` 👩, **desmarcando** "já mudar" | Duas etiquetas **empilhadas** no mesmo círculo; `HEAD` continua na `master`; histórico mostra `git branch feature/login` |
-| 4 | Checkout `feature/login` | `◀ HEAD` pula para a etiqueta rosa; barra do topo mostra 👩 Ana; faixa rosa acende |
-| 5 | Commit "form" | Novo círculo na faixa rosa, com curva descendo do `c0`. **A etiqueta `feature/login` precisa DESLIZAR visivelmente** do círculo antigo para o novo, ao longo de ~0,3s. Se ela pular instantaneamente, o reaproveitamento por chave em `Graph` quebrou — pare e conserte, é o principal recurso didático do app |
+| 4 | Checkout `feature/login` | `◀ HEAD` pula para a etiqueta da `feature/login` (a segunda cor da paleta); barra do topo mostra 👩 Ana; a faixa dela acende com o azul de destaque `#1e3a6b` |
+| 5 | Commit "form" | Novo círculo na faixa da `feature/login`, com curva descendo do `c0`. **A etiqueta `feature/login` precisa DESLIZAR visivelmente** do círculo antigo para o novo, ao longo de ~0,3s. Se ela pular instantaneamente, o reaproveitamento por chave em `Graph` quebrou — pare e conserte, é o principal recurso didático do app |
 | 6 | Checkout `master`, commit "header" | Círculo azul na faixa 0; as duas linhas agora divergem visivelmente |
 | 7 | Merge `feature/login` | Aparece o commit de merge com **duas** linhas chegando nele |
 | 8 | `↶ Desfazer` | O commit de merge some; clicando até o fim, o botão desabilita |
