@@ -40,9 +40,17 @@
     for (var d = 0; d < estado.devs.length; d++) emojiDoDev[estado.devs[d].id] = estado.devs[d].emoji;
     for (var k = 0; k < estado.branches.length; k++) corDaFaixa[estado.branches[k].faixa] = estado.branches[k].cor;
 
+    // A faixa de uma branch apagada continua com a cor dela. Os commits que
+    // sobraram ali são commits VIVOS — sem isto cairiam no || COR_FANTASMA lá
+    // embaixo e o projetor diria "abandonado" sobre trabalho que está dentro da
+    // master. Estados gravados antes desta feature não têm o campo.
+    var apagadas = estado.faixasApagadas || [];
+    for (var ka = 0; ka < apagadas.length; ka++) corDaFaixa[apagadas[ka].faixa] = apagadas[ka].cor;
+
     // ----- nós -----
     var pos = {};
     var nos = [];
+    var faixaTemVivo = {};
     for (var c = 0; c < estado.commits.length; c++) {
       var commit = estado.commits[c];
       var orfao = orfaos[commit.id] === true;
@@ -50,6 +58,7 @@
       var x = MARGEM_X + commit.ordem * ESPACO_X;
       var y = MARGEM_Y + faixa * ESPACO_Y;
       pos[commit.id] = { x: x, y: y, faixa: faixa };
+      if (!orfao) faixaTemVivo[faixa] = true;
       nos.push({
         id: commit.id,
         x: x,
@@ -169,6 +178,21 @@
         nome: bf.nome,
         cor: bf.cor,
         ativa: estado.HEAD.branch === bf.nome,
+        fantasma: false
+      });
+    }
+    for (var fa = 0; fa < apagadas.length; fa++) {
+      // Só enquanto sobrar commit vivo na faixa. O -D manda os commits dela para
+      // a faixa fantasma, e um reset posterior na master pode esvaziá-la depois:
+      // nos dois casos a faixa some do desenho e sobra só o espaço vertical, em
+      // vez de uma linha rotulada e vazia esticando a altura do canvas.
+      if (!faixaTemVivo[apagadas[fa].faixa]) continue;
+      faixas.push({
+        indice: apagadas[fa].faixa,
+        y: MARGEM_Y + apagadas[fa].faixa * ESPACO_Y,
+        nome: apagadas[fa].nome + " (apagada)",
+        cor: apagadas[fa].cor,
+        ativa: false,
         fantasma: false
       });
     }

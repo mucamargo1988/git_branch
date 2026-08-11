@@ -688,6 +688,41 @@ teste("apagar uma branch não faz os commits abandonados mudarem de faixa", func
     "o commit abandonado não pode subir de linha só porque uma branch sumiu");
 });
 
+teste("faixa de branch apagada mantém a cor e ganha o rótulo (apagada)", function () {
+  var m = cenarioMesclado();
+  var br = Repo.acharBranch(m.estado, "feature");
+  var l = Layout.calcular(Repo.excluirBranch(m.estado, "feature", false).estado);
+
+  var no = acharNo(l, m.c2);
+  igual(no.orfao, false, "o merge trouxe c2 para a master: ele está vivo");
+  igual(no.cor, br.cor, "commit vivo não pode ficar cinza — cinza aqui quer dizer abandonado");
+
+  var faixa = null;
+  for (var i = 0; i < l.faixas.length; i++) if (l.faixas[i].indice === br.faixa) faixa = l.faixas[i];
+  verdade(faixa !== null, "a faixa ainda tem commit vivo, então continua desenhada");
+  igual(faixa.nome, "feature (apagada)");
+  igual(faixa.cor, br.cor);
+  igual(faixa.ativa, false);
+  igual(faixa.fantasma, false, "apagada não é o mesmo que abandonada");
+});
+
+teste("faixa esvaziada pelo -D não é desenhada", function () {
+  var c = cenarioDivergente();
+  var faixaFeature = Repo.acharBranch(c.estado, "feature").faixa;
+  var l = Layout.calcular(Repo.excluirBranch(c.estado, "feature", true).estado);
+  igual(acharNo(l, c.c2).orfao, true, "c2 perdeu a etiqueta que o alcançava");
+  for (var i = 0; i < l.faixas.length; i++) {
+    verdade(l.faixas[i].indice !== faixaFeature,
+      "a faixa ficou vazia: uma faixa rotulada e sem commit só esticaria a altura à toa");
+  }
+});
+
+teste("Layout.calcular aceita estado antigo, sem o campo faixasApagadas", function () {
+  var c = cenarioDivergente();
+  delete c.estado.faixasApagadas;
+  igual(Layout.calcular(c.estado).faixas.length, 2, "as duas branches continuam desenhadas");
+});
+
 // ---------- ui.js: largura das barras laterais ----------
 
 teste("clampLargura deixa passar um valor no meio da faixa", function () {
