@@ -253,17 +253,19 @@ Criar `repo.js`:
 (function (raiz) {
   "use strict";
 
-  // Cores por faixa. Índice 0 = master. Escolhidas para contraste alto em projetor
-  // e para permanecerem distinguíveis entre si mesmo com matiz distorcida.
+  // Cores por faixa. Índice 0 = master. Calibradas para o TEMA ESCURO: tons claros
+  // e saturados, que rendem em projetor e continuam distinguíveis entre si mesmo
+  // com a matiz distorcida pela lente. Tons médios (#2563eb e afins) sumiriam
+  // contra o fundo #0f172a.
   var CORES = [
-    "#2563eb", // azul
-    "#e11d48", // rosa
-    "#16a34a", // verde
-    "#d97706", // âmbar
-    "#7c3aed", // roxo
-    "#0891b2", // ciano
-    "#b45309", // marrom
-    "#4d7c0f"  // oliva
+    "#60a5fa", // azul
+    "#fb7185", // rosa
+    "#4ade80", // verde
+    "#fbbf24", // âmbar
+    "#c084fc", // roxo
+    "#22d3ee", // ciano
+    "#fb923c", // laranja
+    "#a3e635"  // lima
   ];
 
   // SHA falso: hash FNV-1a do contador. Parece um sha de verdade e é determinístico,
@@ -1258,7 +1260,7 @@ Criar `layout.js`:
   var DESLOC_ETIQUETA_X = 34;  // etiqueta fica à direita do commit-ponta
   var ALTURA_ETIQUETA = 30;    // passo do empilhamento
   var ESPACO_ETIQUETAS = 240;  // folga à direita para caber as etiquetas
-  var COR_FANTASMA = "#9ca3af";
+  var COR_FANTASMA = "#64748b"; // cinza-ardósia: visível no escuro, claramente apagado
 
   function calcular(estado) {
     var orfaos = {};
@@ -1445,13 +1447,16 @@ Criar `testes.html`:
   <meta charset="utf-8">
   <title>Testes — App de Branches</title>
   <style>
-    body { font: 16px/1.6 system-ui, sans-serif; margin: 40px auto; max-width: 760px; color: #111827; }
+    body {
+      font: 16px/1.6 system-ui, sans-serif; margin: 40px auto; max-width: 760px;
+      color: #e2e8f0; background: #0f172a;
+    }
     h1 { font-size: 22px; }
     #resumo { font-size: 20px; font-weight: 700; padding: 12px 16px; border-radius: 8px; margin: 20px 0; }
-    .tudo-ok { background: #dcfce7; color: #166534; }
-    .tem-falha { background: #fee2e2; color: #991b1b; }
+    .tudo-ok { background: #14532d; color: #86efac; }
+    .tem-falha { background: #7f1d1d; color: #fca5a5; }
     li { list-style: none; padding: 4px 0; }
-    pre { background: #f3f4f6; padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+    pre { background: #1e293b; padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -1626,17 +1631,24 @@ EOF
 - [ ] **Step 2: Crie `styles.css`**
 
 ```css
-/* Fundo claro de propósito: sala de aula com luz acesa. Tipografia grande para
-   leitura no fundo da sala. */
+/* Tema escuro. Projetor em sala com a luz baixa: fundo escuro cansa menos a vista
+   e faz as cores das branches saltarem. Tipografia grande para leitura no fundo
+   da sala.
+
+   O fundo NÃO é preto puro: projetor com preto absoluto revela poeira e pontos
+   quentes da lente. Um azul-ardósia bem escuro rende melhor. */
 
 :root {
-  --texto: #111827;
-  --texto-suave: #6b7280;
-  --borda: #e5e7eb;
-  --fundo: #ffffff;
-  --fundo-painel: #f9fafb;
-  --destaque: #2563eb;
-  --erro: #b91c1c;
+  --texto: #e2e8f0;
+  --texto-suave: #94a3b8;
+  --borda: #334155;
+  --fundo: #0f172a;
+  --fundo-painel: #1e293b;
+  --fundo-campo: #0b1220;
+  --destaque: #3b82f6;
+  --erro: #f87171;
+  --realce: #fde68a;
+  --realce-fundo: #422006;
 }
 
 * { box-sizing: border-box; }
@@ -1712,10 +1724,16 @@ input[type="text"], select {
   padding: 8px 10px;
   font: inherit;
   font-size: 15px;
+  color: var(--texto);
   border: 1px solid var(--borda);
   border-radius: 6px;
-  background: #fff;
+  background: var(--fundo-campo);
   margin-bottom: 6px;
+}
+input[type="text"]::placeholder { color: #64748b; }
+input[type="text"]:focus, select:focus {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
 }
 
 .dupla { display: grid; grid-template-columns: 1fr 68px; gap: 6px; }
@@ -1742,19 +1760,21 @@ input[type="text"], select {
   border-radius: 6px;
   cursor: pointer;
 }
-.botao:hover { filter: brightness(1.1); }
-.botao:disabled { background: #cbd5e1; cursor: not-allowed; }
+.botao:hover { filter: brightness(1.15); }
+.botao:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
 
 .botao-secundario {
   padding: 7px 14px;
   font: inherit;
   font-size: 15px;
-  background: #fff;
+  color: var(--texto);
+  background: var(--fundo-campo);
   border: 1px solid var(--borda);
   border-radius: 6px;
   cursor: pointer;
 }
-.botao-secundario:disabled { color: #cbd5e1; cursor: not-allowed; }
+.botao-secundario:hover:not(:disabled) { border-color: var(--destaque); }
+.botao-secundario:disabled { color: #475569; cursor: not-allowed; }
 
 .erro {
   color: var(--erro);
@@ -1764,7 +1784,7 @@ input[type="text"], select {
 }
 
 .nota { font-size: 13px; color: var(--texto-suave); margin-top: 14px; }
-.nota code { background: #e5e7eb; padding: 1px 5px; border-radius: 4px; }
+.nota code { background: var(--fundo-campo); color: var(--texto); padding: 1px 5px; border-radius: 4px; }
 
 /* ---------- equipe ---------- */
 
@@ -1777,7 +1797,7 @@ input[type="text"], select {
   border-left: 5px solid transparent;
   margin-bottom: 4px;
 }
-.dev.ativo { background: #eff6ff; font-weight: 600; }
+.dev.ativo { background: #1d3a6b; font-weight: 600; }
 .dev-emoji { font-size: 24px; line-height: 1; }
 .dev-nome { font-size: 15px; }
 .dev-branch { font-size: 13px; color: var(--texto-suave); }
@@ -1789,10 +1809,14 @@ input[type="text"], select {
 #lista-historico code {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--texto);
   word-break: break-word;
 }
-#lista-historico li.recente code { background: #fef9c3; font-weight: 700; }
+#lista-historico li.recente code {
+  background: var(--realce-fundo);
+  color: var(--realce);
+  font-weight: 700;
+}
 
 /* ---------- avisos ---------- */
 
@@ -1802,7 +1826,8 @@ input[type="text"], select {
   padding: 9px 14px;
   border-radius: 6px;
   font-size: 15px;
-  background: #fef9c3;
+  color: var(--realce);
+  background: var(--realce-fundo);
   border-left: 5px solid #ca8a04;
 }
 
@@ -1813,25 +1838,29 @@ input[type="text"], select {
 #dica-vazio { color: var(--texto-suave); font-size: 19px; padding: 50px 10px; }
 
 .faixa-fundo { fill: transparent; }
-.faixa-fundo.ativa { fill: #eff6ff; }
-.faixa-nome { font-size: 14px; font-weight: 700; fill: #6b7280; }
+.faixa-fundo.ativa { fill: #172554; }
+.faixa-nome { font-size: 14px; font-weight: 700; fill: var(--texto-suave); }
 
 .aresta { fill: none; stroke-width: 4; transition: d 300ms ease, stroke 300ms ease; }
 .aresta.fantasma { stroke-dasharray: 7 6; }
 
 .no { transition: transform 300ms ease; }
-.no-circulo { stroke: #fff; stroke-width: 3; }
+/* O anel em volta do commit é da cor do FUNDO, não branco: ele existe para abrir
+   um respiro entre a bolinha e a linha que passa atrás dela. */
+.no-circulo { stroke: var(--fundo); stroke-width: 3; }
 .no.fantasma .no-circulo { stroke-dasharray: 5 4; opacity: 0.55; }
 .no-emoji { font-size: 19px; text-anchor: middle; dominant-baseline: central; }
-.no-msg { font-size: 13px; fill: #4b5563; text-anchor: middle; }
-.no.fantasma .no-msg { fill: #9ca3af; }
+.no-msg { font-size: 13px; fill: var(--texto-suave); text-anchor: middle; }
+.no.fantasma .no-msg { fill: #64748b; }
 
 .etiqueta { transition: transform 300ms ease; }
 .etiqueta-fundo { rx: 6; ry: 6; }
-.etiqueta-texto { font-size: 15px; font-weight: 700; fill: #fff; dominant-baseline: central; }
+/* Texto ESCURO sobre a pílula clara. As cores de branch no tema escuro são
+   claras e saturadas; texto branco em cima delas teria contraste baixo. */
+.etiqueta-texto { font-size: 15px; font-weight: 700; fill: #0f172a; dominant-baseline: central; }
 .etiqueta-linha { stroke-width: 2; }
 .marca-head {
-  font-size: 13px; font-weight: 800; fill: #111827; dominant-baseline: central;
+  font-size: 13px; font-weight: 800; fill: var(--texto); dominant-baseline: central;
 }
 
 @media (prefers-reduced-motion: reduce) {
