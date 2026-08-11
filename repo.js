@@ -1,17 +1,19 @@
 (function (raiz) {
   "use strict";
 
-  // Cores por faixa. Índice 0 = master. Escolhidas para contraste alto em projetor
-  // e para permanecerem distinguíveis entre si mesmo com matiz distorcida.
+  // Cores por faixa. Índice 0 = master. Calibradas para o TEMA ESCURO: tons claros
+  // e saturados, que rendem em projetor e continuam distinguíveis entre si mesmo
+  // com a matiz distorcida pela lente. Tons médios (#2563eb e afins) sumiriam
+  // contra o fundo #0f172a.
   var CORES = [
-    "#2563eb", // azul
-    "#e11d48", // rosa
-    "#16a34a", // verde
-    "#d97706", // âmbar
-    "#7c3aed", // roxo
-    "#0891b2", // ciano
-    "#b45309", // marrom
-    "#4d7c0f"  // oliva
+    "#60a5fa", // azul
+    "#fb7185", // rosa
+    "#4ade80", // verde
+    "#fbbf24", // âmbar
+    "#c084fc", // roxo
+    "#22d3ee", // ciano
+    "#fb923c", // laranja
+    "#a3e635"  // lima
   ];
 
   // SHA falso: hash FNV-1a do contador. Parece um sha de verdade e é determinístico,

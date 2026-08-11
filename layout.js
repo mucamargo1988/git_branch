@@ -15,7 +15,7 @@
   var DESLOC_ETIQUETA_X = 34;  // etiqueta fica à direita do commit-ponta
   var ALTURA_ETIQUETA = 30;    // passo do empilhamento
   var ESPACO_ETIQUETAS = 240;  // folga à direita para caber as etiquetas
-  var COR_FANTASMA = "#9ca3af";
+  var COR_FANTASMA = "#64748b"; // cinza-ardósia: visível no escuro, claramente apagado
 
   function calcular(estado) {
     var orfaos = {};
