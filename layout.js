@@ -15,6 +15,7 @@
   var DESLOC_ETIQUETA_X = 34;  // etiqueta fica à direita do commit-ponta
   var ALTURA_ETIQUETA = 30;    // passo do empilhamento
   var LARGURA_HEAD = 62;       // folga para "◀ HEAD" depois da pílula, com margem
+  var MEIA_LEGENDA = 55;       // metade da largura máxima de uma legenda de 12 caracteres
   var COR_FANTASMA = "#64748b"; // cinza-ardósia: visível no escuro, claramente apagado
 
   function calcular(estado) {
@@ -142,7 +143,7 @@
     // A largura vem do conteúdo, não de uma folga fixa: cada etiqueta reserva
     // espaço para a própria pílula MAIS o marcador "◀ HEAD", ainda que ela não
     // seja o HEAD agora — assim o canvas não pula de largura quando o HEAD muda.
-    var largura = maiorX + RAIO + 20;
+    var largura = maiorX + MEIA_LEGENDA;
     for (var ie = 0; ie < etiquetas.length; ie++) {
       var direita = etiquetas[ie].x + etiquetas[ie].larguraPilula + 10 + LARGURA_HEAD;
       if (direita > largura) largura = direita;
