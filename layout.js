@@ -93,19 +93,65 @@
     for (var o = 0; o < ordemPonta.length; o++) {
       var pontaId = ordemPonta[o];
       var grupo = porPonta[pontaId];
-      var centro = ((grupo.length - 1) * ALTURA_ETIQUETA) / 2;
+
+      // Se algum nó está na mesma linha do commit-ponta e mais à direita dele,
+      // é porque a faixa da PARENTE seguiu crescendo depois que essa branch foi
+      // criada e ficou parada ali: ancorar a etiqueta no commit-ponta faria a
+      // pílula cobrir os commits que vieram depois. Nesse caso ela desce para a
+      // própria faixa — garantidamente vazia, já que uma branch só ganha
+      // commits na própria faixa, então se a ponta está em outra faixa é sinal
+      // de que ela nunca commitou nada. O conector (graph.js) passa a apontar
+      // de volta, na diagonal, para o commit onde a branch ficou — o que é
+      // exatamente o que mostra que ela não acompanhou quem seguiu em frente.
+      var ficam = [];
+      var descem = [];
       for (var g = 0; g < grupo.length; g++) {
-        var emoji = emojiDoDev[grupo[g].donoId] || "🧑‍💻";
-        var rotulo = emoji + " " + grupo[g].nome;
+        var precisaDescer = false;
+        for (var ni = 0; ni < nos.length; ni++) {
+          if (nos[ni].y === pos[pontaId].y && nos[ni].x > pos[pontaId].x) {
+            precisaDescer = true;
+            break;
+          }
+        }
+        if (precisaDescer) descem.push(grupo[g]);
+        else ficam.push(grupo[g]);
+      }
+
+      // Quem fica continua empilhando no commit-ponta, mas o centro do
+      // empilhamento agora considera só quem ficou — senão um grupo que perde
+      // um membro para o "descem" ficaria centrado como se ainda tivesse todos.
+      var centro = ((ficam.length - 1) * ALTURA_ETIQUETA) / 2;
+      for (var fi = 0; fi < ficam.length; fi++) {
+        var emojiF = emojiDoDev[ficam[fi].donoId] || "🧑‍💻";
+        var rotuloF = emojiF + " " + ficam[fi].nome;
         etiquetas.push({
-          nome: grupo[g].nome,
-          cor: grupo[g].cor,
-          emoji: emoji,
+          nome: ficam[fi].nome,
+          cor: ficam[fi].cor,
+          emoji: emojiF,
           commitId: pontaId,
           x: pos[pontaId].x + DESLOC_ETIQUETA_X,
-          y: pos[pontaId].y + g * ALTURA_ETIQUETA - centro,
-          ehHead: estado.HEAD.branch === grupo[g].nome,
-          larguraPilula: 22 + rotulo.length * 9.5
+          y: pos[pontaId].y + fi * ALTURA_ETIQUETA - centro,
+          ehHead: estado.HEAD.branch === ficam[fi].nome,
+          larguraPilula: 22 + rotuloF.length * 9.5
+        });
+      }
+
+      // Quem desce vai para o y da própria faixa, sem deslocamento de
+      // empilhamento: cada branch tem a sua faixa só para ela, então não há
+      // como duas etiquetas "descidas" colidirem entre si. O x não muda — é
+      // isso que faz o conector apontar de volta para o commit-ponta.
+      for (var di = 0; di < descem.length; di++) {
+        var emojiD = emojiDoDev[descem[di].donoId] || "🧑‍💻";
+        var rotuloD = emojiD + " " + descem[di].nome;
+        etiquetas.push({
+          nome: descem[di].nome,
+          cor: descem[di].cor,
+          emoji: emojiD,
+          commitId: pontaId,
+          x: pos[pontaId].x + DESLOC_ETIQUETA_X,
+          y: MARGEM_Y + descem[di].faixa * ESPACO_Y,
+          ehHead: estado.HEAD.branch === descem[di].nome,
+          larguraPilula: 22 + rotuloD.length * 9.5
         });
       }
     }

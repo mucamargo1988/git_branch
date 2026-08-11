@@ -534,6 +534,41 @@ teste("nós carregam a cor da faixa e o emoji do autor", function () {
   igual(n.emoji, "👩");
 });
 
+teste("etiqueta de branch deixada para tras nao cobre os commits seguintes", function () {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  e = Repo.commit(e, "c1").estado;
+  e = Repo.criarBranch(e, "login", { nome: "Ana", emoji: "👩" }, false).estado;
+  e = Repo.commit(e, "c2").estado;
+  e = Repo.commit(e, "c3").estado;
+  var l = Layout.calcular(e);
+
+  var etLogin = null, etMaster = null;
+  for (var i = 0; i < l.etiquetas.length; i++) {
+    if (l.etiquetas[i].nome === "login") etLogin = l.etiquetas[i];
+    if (l.etiquetas[i].nome === "master") etMaster = l.etiquetas[i];
+  }
+  verdade(etLogin, "a etiqueta login precisa existir");
+
+  for (var j = 0; j < l.nos.length; j++) {
+    var n = l.nos[j];
+    var coberto = Math.abs(n.y - etLogin.y) < Layout.ESPACO_Y / 2 &&
+                  n.x > etLogin.x && n.x < etLogin.x + etLogin.larguraPilula;
+    verdade(!coberto, "a etiqueta login esta cobrindo o commit " + n.mensagem);
+  }
+  verdade(etLogin.y > etMaster.y, "login deve descer para a propria faixa");
+});
+
+teste("dois nomes um ponto: etiquetas seguem empilhadas quando nada veio depois", function () {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  e = Repo.criarBranch(e, "login", { nome: "Ana", emoji: "👩" }, false).estado;
+  var l = Layout.calcular(e);
+  igual(l.etiquetas.length, 2);
+  igual(l.etiquetas[0].x, l.etiquetas[1].x, "mesma coluna");
+  verdade(l.etiquetas[0].y !== l.etiquetas[1].y, "empilhadas, nao sobrepostas");
+  verdade(Math.abs(l.etiquetas[0].y - l.etiquetas[1].y) < Layout.ESPACO_Y / 2,
+    "as duas continuam juntas no mesmo commit");
+});
+
 // ---------- executor no Node ----------
 
 if (typeof window === "undefined") {
