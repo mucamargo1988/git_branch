@@ -37,6 +37,13 @@
       }
       if (!branchExiste || typeof estado.proximoId !== "number") return null;
 
+      // Campo novo (apagar branch). Um estado gravado antes dele é perfeitamente
+      // válido — só não tem a lista. Normaliza aqui, no ponto onde dado estranho
+      // entra, em vez de somar o campo ao guard acima: aquele guard devolve null,
+      // e devolver null aqui apagaria o repositório de uma aula em andamento na
+      // primeira abertura depois da atualização.
+      if (!Array.isArray(estado.faixasApagadas)) estado.faixasApagadas = [];
+
       return estado;
     } catch (err) {
       return null;
