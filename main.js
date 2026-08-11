@@ -3,9 +3,31 @@
 
   var estado = null;
 
+  var ESCALA_MINIMA = 0.55; // abaixo disso o texto fica ilegível no projetor
+
+  // Recebe as dimensões que Graph.desenhar REALMENTE usou, não as do layout:
+  // quando há etiquetas acima de y=0, a altura desenhada é maior que layout.altura.
+  function ajustarZoom(dims) {
+    var area = document.querySelector(".area-grafo");
+    var svg = document.getElementById("grafo");
+    var disponivel = area.clientWidth - 40;
+
+    var escala = Math.min(1, disponivel / dims.largura);
+    if (escala < ESCALA_MINIMA) escala = ESCALA_MINIMA;
+
+    svg.style.transform = "scale(" + escala + ")";
+    // O elemento encolhe visualmente mas não no fluxo: reservamos o espaço real
+    // para que a rolagem horizontal funcione quando a escala trava no mínimo.
+    svg.style.marginBottom = (dims.altura * (escala - 1)) + "px";
+    svg.style.marginRight = (dims.largura * (escala - 1)) + "px";
+
+    // Acompanha o commit mais recente.
+    area.scrollLeft = area.scrollWidth;
+  }
+
   function redesenhar() {
     UI.atualizar(estado);
-    Graph.desenhar(Layout.calcular(estado));
+    ajustarZoom(Graph.desenhar(Layout.calcular(estado)));
     document.getElementById("btn-desfazer").disabled = !Storage.podeDesfazer();
   }
 
@@ -56,6 +78,7 @@
     UI.montar(executar);
     document.getElementById("btn-desfazer").addEventListener("click", desfazer);
     document.getElementById("btn-reiniciar").addEventListener("click", reiniciar);
+    window.addEventListener("resize", function () { redesenhar(); });
     redesenhar();
   }
 
