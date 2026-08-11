@@ -77,6 +77,7 @@
     if (nomeAcao === "criarBranch") return aplicar(nomeAcao, Repo.criarBranch(estado, p.nome, p.dono, p.jaMudar));
     if (nomeAcao === "checkout") return aplicar(nomeAcao, Repo.checkout(estado, p.nome));
     if (nomeAcao === "merge") return aplicar(nomeAcao, Repo.merge(estado, p.nome));
+    if (nomeAcao === "excluirBranch") return aplicar(nomeAcao, Repo.excluirBranch(estado, p.nome, p.forcar));
     if (nomeAcao === "reset") return aplicar(nomeAcao, Repo.reset(estado, p.commitId));
     if (nomeAcao === "editarDev") return aplicar(nomeAcao, Repo.editarDev(estado, p.donoId, p.nome, p.emoji));
   }

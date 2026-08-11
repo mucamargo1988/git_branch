@@ -102,6 +102,13 @@
       aoExecutar("merge", { nome: pegar("sel-merge").value });
     });
 
+    pegar("btn-excluir").addEventListener("click", function () {
+      aoExecutar("excluirBranch", {
+        nome: pegar("sel-excluir").value,
+        forcar: pegar("forcar-exclusao").checked
+      });
+    });
+
     pegar("btn-reset").addEventListener("click", function () {
       aoExecutar("reset", { commitId: pegar("sel-reset").value });
     });
@@ -245,10 +252,14 @@
       pegar("nome-dono").value = "";
       pegar("emoji-dono").value = "";
     }
+    // Desmarca depois de um apagar bem-sucedido (limparCampos só roda quando dá
+    // certo). Deixar a caixa armada faria o PRÓXIMO delete abandonar commits em
+    // silêncio, sem a recusa que é justamente o ponto da lição.
+    if (nomeAcao === "excluirBranch") pegar("forcar-exclusao").checked = false;
   }
 
   function limparErros() {
-    ["commit", "branch", "checkout", "merge", "reset"].forEach(function (n) {
+    ["commit", "branch", "checkout", "merge", "excluir", "reset"].forEach(function (n) {
       pegar("erro-" + n).textContent = "";
     });
     pegar("avisos").innerHTML = "";
@@ -259,6 +270,7 @@
     criarBranch: "erro-branch",
     checkout: "erro-checkout",
     merge: "erro-merge",
+    excluirBranch: "erro-excluir",
     reset: "erro-reset",
     editarDev: "erro-branch"
   };
@@ -424,6 +436,11 @@
       .map(function (b) { return { valor: b.nome, rotulo: b.nome + " → " + atual }; }),
       "nada para mesclar");
 
+    preencher(pegar("sel-excluir"), estado.branches
+      .filter(function (b) { return b.nome !== atual; })
+      .map(function (b) { return { valor: b.nome, rotulo: b.nome }; }),
+      "só existe a branch atual");
+
     preencher(pegar("sel-reset"), Repo.commitsAlcancaveis(estado)
       .map(function (c) { return { valor: c.id, rotulo: c.id + "  " + c.mensagem }; }),
       "sem commit anterior");
@@ -440,7 +457,7 @@
     // Botão segue o select: sem opção para escolher, não há o que executar.
     // Sem isto, clicar em Merge no início da aula joga no projetor a mensagem
     // sem sentido "A branch  não existe."
-    ["checkout", "merge", "reset"].forEach(function (n) {
+    ["checkout", "merge", "excluir", "reset"].forEach(function (n) {
       pegar("btn-" + n).disabled = pegar("sel-" + n).disabled;
     });
 
