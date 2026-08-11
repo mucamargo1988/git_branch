@@ -401,6 +401,14 @@ input[type="text"]:focus, select:focus {
       </div>
 
       <div class="acao">
+        <label for="sel-excluir">Apagar branch</label>
+        <select id="sel-excluir"></select>
+        <label class="checkbox"><input id="forcar-exclusao" type="checkbox"> Forçar (-D)</label>
+        <button id="btn-excluir" class="botao">Apagar</button>
+        <p class="erro" id="erro-excluir"></p>
+      </div>
+
+      <div class="acao">
         <label for="sel-reset">Voltar para o commit</label>
         <select id="sel-reset"></select>
         <button id="btn-reset" class="botao">Reset</button>
@@ -470,6 +478,7 @@ input[type="text"]:focus, select:focus {
       HEAD: { branch: "master" },
       devs: [{ id: "voce", nome: "Você", emoji: "🧑‍💻" }],
       historico: [{ n: 1, comando: "git init" }],
+      faixasApagadas: [],
       proximoId: 1,
       proximaFaixa: 1
     };
@@ -618,6 +627,58 @@ input[type="text"]:focus, select:focus {
       comando = "git branch " + nome;
     }
 
+    registrar(e, comando);
+    return { ok: true, estado: e, comando: comando };
+  }
+
+  function excluirBranch(estado, nome, forcar) {
+    var alvo = acharBranch(estado, nome);
+    if (!alvo) {
+      return { ok: false, erro: "A branch " + nome + " não existe." };
+    }
+    // O Git real também recusa. Aqui isso vale dobrado: é este bloqueio que
+    // garante que nenhuma sequência de operações leva a um repositório sem
+    // branch nenhuma, com o HEAD apontando para o vazio. Por isso não existe
+    // versão forçada dele.
+    if (estado.HEAD.branch === nome) {
+      return { ok: false, erro: "Não dá para apagar a branch em que você está. Faça checkout em outra antes." };
+    }
+
+    // Mesmo teste que o merge usa para dizer "Already up to date": se a ponta do
+    // alvo já é ancestral da ponta da atual, tudo que ele tinha continua
+    // alcançável depois que a etiqueta sumir — não há o que perder. Branch sem
+    // ponta cai no mesmo balde por não ter nada a perder de saída.
+    var atual = branchAtual(estado);
+    var mesclada = !alvo.pontaId || ehAncestral(estado, alvo.pontaId, atual.pontaId);
+    if (!mesclada && !forcar) {
+      return {
+        ok: false,
+        erro: "A branch " + nome + " não foi mesclada em " + atual.nome +
+          ". Marque \"Forçar (-D)\" para apagar mesmo assim — os commits dela ficam abandonados."
+      };
+    }
+
+    var e = clonar(estado);
+    // Estados gravados antes desta feature (localStorage de uma aula em
+    // andamento, pilha de desfazer) não têm o campo.
+    if (!e.faixasApagadas) e.faixasApagadas = [];
+
+    for (var i = 0; i < e.branches.length; i++) {
+      if (e.branches[i].nome === nome) {
+        // O rastro é o que mantém cor e rótulo da faixa depois que a única fonte
+        // dos dois — a branch em e.branches — sai da lista. Sem ele, commits
+        // VIVOS da faixa apareceriam cinzas, e cinza no app inteiro quer dizer
+        // "abandonado".
+        e.faixasApagadas.push({ faixa: e.branches[i].faixa, nome: nome, cor: e.branches[i].cor });
+        e.branches.splice(i, 1);
+        break;
+      }
+    }
+
+    // Commits, devs e HEAD não são tocados: quem decide se algum commit vai para
+    // a faixa fantasma é orfaos(), pela alcançabilidade, sem saber que houve um
+    // delete.
+    var comando = "git branch " + (forcar ? "-D " : "-d ") + nome;
     registrar(e, comando);
     return { ok: true, estado: e, comando: comando };
   }
@@ -777,6 +838,7 @@ input[type="text"]:focus, select:focus {
     commit: commit,
     editarDev: editarDev,
     criarBranch: criarBranch,
+    excluirBranch: excluirBranch,
     checkout: checkout,
     alcancaveis: alcancaveis,
     ehAncestral: ehAncestral,
@@ -819,16 +881,29 @@ input[type="text"]:focus, select:focus {
     for (var b = 0; b < estado.branches.length; b++) {
       if (estado.branches[b].faixa > maiorFaixa) maiorFaixa = estado.branches[b].faixa;
     }
-    var faixaFantasma = maiorFaixa + 1;
+    // proximaFaixa, e não maiorFaixa + 1: apagar uma branch DIMINUI maiorFaixa, e
+    // a faixa fantasma subiria um degrau levando junto os commits abandonados que
+    // já estavam na tela — a reorganização de desenho que a spec proíbe. proximaFaixa
+    // só cresce. O max cobre um estado montado à mão em que ela tenha ficado para
+    // trás, garantindo que a fantasma nunca caia em cima de uma faixa viva.
+    var faixaFantasma = Math.max(estado.proximaFaixa || 0, maiorFaixa + 1);
 
     var corDaFaixa = {};
     var emojiDoDev = {};
     for (var d = 0; d < estado.devs.length; d++) emojiDoDev[estado.devs[d].id] = estado.devs[d].emoji;
     for (var k = 0; k < estado.branches.length; k++) corDaFaixa[estado.branches[k].faixa] = estado.branches[k].cor;
 
+    // A faixa de uma branch apagada continua com a cor dela. Os commits que
+    // sobraram ali são commits VIVOS — sem isto cairiam no || COR_FANTASMA lá
+    // embaixo e o projetor diria "abandonado" sobre trabalho que está dentro da
+    // master. Estados gravados antes desta feature não têm o campo.
+    var apagadas = estado.faixasApagadas || [];
+    for (var ka = 0; ka < apagadas.length; ka++) corDaFaixa[apagadas[ka].faixa] = apagadas[ka].cor;
+
     // ----- nós -----
     var pos = {};
     var nos = [];
+    var faixaTemVivo = {};
     for (var c = 0; c < estado.commits.length; c++) {
       var commit = estado.commits[c];
       var orfao = orfaos[commit.id] === true;
@@ -836,6 +911,7 @@ input[type="text"]:focus, select:focus {
       var x = MARGEM_X + commit.ordem * ESPACO_X;
       var y = MARGEM_Y + faixa * ESPACO_Y;
       pos[commit.id] = { x: x, y: y, faixa: faixa };
+      if (!orfao) faixaTemVivo[faixa] = true;
       nos.push({
         id: commit.id,
         x: x,
@@ -955,6 +1031,21 @@ input[type="text"]:focus, select:focus {
         nome: bf.nome,
         cor: bf.cor,
         ativa: estado.HEAD.branch === bf.nome,
+        fantasma: false
+      });
+    }
+    for (var fa = 0; fa < apagadas.length; fa++) {
+      // Só enquanto sobrar commit vivo na faixa. O -D manda os commits dela para
+      // a faixa fantasma, e um reset posterior na master pode esvaziá-la depois:
+      // nos dois casos a faixa some do desenho e sobra só o espaço vertical, em
+      // vez de uma linha rotulada e vazia esticando a altura do canvas.
+      if (!faixaTemVivo[apagadas[fa].faixa]) continue;
+      faixas.push({
+        indice: apagadas[fa].faixa,
+        y: MARGEM_Y + apagadas[fa].faixa * ESPACO_Y,
+        nome: apagadas[fa].nome + " (apagada)",
+        cor: apagadas[fa].cor,
+        ativa: false,
         fantasma: false
       });
     }
@@ -1279,6 +1370,13 @@ input[type="text"]:focus, select:focus {
       }
       if (!branchExiste || typeof estado.proximoId !== "number") return null;
 
+      // Campo novo (apagar branch). Um estado gravado antes dele é perfeitamente
+      // válido — só não tem a lista. Normaliza aqui, no ponto onde dado estranho
+      // entra, em vez de somar o campo ao guard acima: aquele guard devolve null,
+      // e devolver null aqui apagaria o repositório de uma aula em andamento na
+      // primeira abertura depois da atualização.
+      if (!Array.isArray(estado.faixasApagadas)) estado.faixasApagadas = [];
+
       return estado;
     } catch (err) {
       return null;
@@ -1418,6 +1516,13 @@ input[type="text"]:focus, select:focus {
 
     pegar("btn-merge").addEventListener("click", function () {
       aoExecutar("merge", { nome: pegar("sel-merge").value });
+    });
+
+    pegar("btn-excluir").addEventListener("click", function () {
+      aoExecutar("excluirBranch", {
+        nome: pegar("sel-excluir").value,
+        forcar: pegar("forcar-exclusao").checked
+      });
     });
 
     pegar("btn-reset").addEventListener("click", function () {
@@ -1563,10 +1668,14 @@ input[type="text"]:focus, select:focus {
       pegar("nome-dono").value = "";
       pegar("emoji-dono").value = "";
     }
+    // Desmarca depois de um apagar bem-sucedido (limparCampos só roda quando dá
+    // certo). Deixar a caixa armada faria o PRÓXIMO delete abandonar commits em
+    // silêncio, sem a recusa que é justamente o ponto da lição.
+    if (nomeAcao === "excluirBranch") pegar("forcar-exclusao").checked = false;
   }
 
   function limparErros() {
-    ["commit", "branch", "checkout", "merge", "reset"].forEach(function (n) {
+    ["commit", "branch", "checkout", "merge", "excluir", "reset"].forEach(function (n) {
       pegar("erro-" + n).textContent = "";
     });
     pegar("avisos").innerHTML = "";
@@ -1577,6 +1686,7 @@ input[type="text"]:focus, select:focus {
     criarBranch: "erro-branch",
     checkout: "erro-checkout",
     merge: "erro-merge",
+    excluirBranch: "erro-excluir",
     reset: "erro-reset",
     editarDev: "erro-branch"
   };
@@ -1742,6 +1852,11 @@ input[type="text"]:focus, select:focus {
       .map(function (b) { return { valor: b.nome, rotulo: b.nome + " → " + atual }; }),
       "nada para mesclar");
 
+    preencher(pegar("sel-excluir"), estado.branches
+      .filter(function (b) { return b.nome !== atual; })
+      .map(function (b) { return { valor: b.nome, rotulo: b.nome }; }),
+      "só existe a branch atual");
+
     preencher(pegar("sel-reset"), Repo.commitsAlcancaveis(estado)
       .map(function (c) { return { valor: c.id, rotulo: c.id + "  " + c.mensagem }; }),
       "sem commit anterior");
@@ -1758,7 +1873,7 @@ input[type="text"]:focus, select:focus {
     // Botão segue o select: sem opção para escolher, não há o que executar.
     // Sem isto, clicar em Merge no início da aula joga no projetor a mensagem
     // sem sentido "A branch  não existe."
-    ["checkout", "merge", "reset"].forEach(function (n) {
+    ["checkout", "merge", "excluir", "reset"].forEach(function (n) {
       pegar("btn-" + n).disabled = pegar("sel-" + n).disabled;
     });
 
@@ -1859,6 +1974,7 @@ input[type="text"]:focus, select:focus {
     if (nomeAcao === "criarBranch") return aplicar(nomeAcao, Repo.criarBranch(estado, p.nome, p.dono, p.jaMudar));
     if (nomeAcao === "checkout") return aplicar(nomeAcao, Repo.checkout(estado, p.nome));
     if (nomeAcao === "merge") return aplicar(nomeAcao, Repo.merge(estado, p.nome));
+    if (nomeAcao === "excluirBranch") return aplicar(nomeAcao, Repo.excluirBranch(estado, p.nome, p.forcar));
     if (nomeAcao === "reset") return aplicar(nomeAcao, Repo.reset(estado, p.commitId));
     if (nomeAcao === "editarDev") return aplicar(nomeAcao, Repo.editarDev(estado, p.donoId, p.nome, p.emoji));
   }

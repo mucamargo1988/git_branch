@@ -20,9 +20,14 @@ Para levar em pendrive ou mandar para os alunos, use `branches-na-pratica.html` 
 | + Branch | `git branch nome` ou `git checkout -b nome` |
 | Checkout | `git checkout nome` |
 | Merge | `git merge nome` |
+| Apagar | `git branch -d nome` ou `git branch -D nome` |
 | Reset | `git reset --hard <sha>` |
 
 Todo comando executado aparece numerado no painel da direita.
+
+Não dá para apagar a branch em que você está. Se a branch tiver commits que
+mais ninguém alcança, é preciso marcar `Forçar (-D)` — e aí eles vão para a
+faixa de commits abandonados, em cinza, em vez de sumir da tela.
 
 As duas barras laterais são ajustáveis: arraste a linha que separa cada uma do
 grafo, ou dê Tab até ela e use as setas. Duplo clique volta à largura original.
