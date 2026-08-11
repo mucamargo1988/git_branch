@@ -1,6 +1,7 @@
 if (typeof require !== "undefined") {
   require("./mini-teste.js");
   require("./repo.js");
+  require("./layout.js");
 }
 
 var teste = MiniTeste.teste;
@@ -332,6 +333,129 @@ teste("commitsAlcancaveis lista do mais novo ao mais antigo, sem a ponta atual",
 
 teste("commitsAlcancaveis em repositório vazio devolve lista vazia", function () {
   igual(Repo.commitsAlcancaveis(Repo.estadoInicial()), []);
+});
+
+// ---------- layout.js ----------
+
+function acharNo(l, id) {
+  for (var i = 0; i < l.nos.length; i++) if (l.nos[i].id === id) return l.nos[i];
+  return null;
+}
+
+teste("layout de repositório vazio", function () {
+  var l = Layout.calcular(Repo.estadoInicial());
+  igual(l.vazio, true);
+  igual(l.nos, []);
+  igual(l.arestas, []);
+});
+
+teste("X segue a ordem de criação, Y segue a faixa", function () {
+  var c = cenarioDivergente(); // c0 e c1 na faixa 0, c2 na faixa 1
+  var l = Layout.calcular(c.estado);
+  var n0 = acharNo(l, c.c0), n1 = acharNo(l, c.c1), n2 = acharNo(l, c.c2);
+  verdade(n0.x < n2.x && n2.x < n1.x, "X cresce com a ordem de criação");
+  igual(n0.y, n1.y, "c0 e c1 estão na mesma faixa");
+  verdade(n2.y > n0.y, "a feature fica abaixo da master");
+});
+
+teste("aresta na mesma faixa é reta, entre faixas é curva", function () {
+  var c = cenarioDivergente();
+  var l = Layout.calcular(c.estado);
+  var tipos = {};
+  for (var i = 0; i < l.arestas.length; i++) {
+    tipos[l.arestas[i].para + "<-" + l.arestas[i].de] = l.arestas[i].tipo;
+  }
+  igual(tipos[c.c1 + "<-" + c.c0], "reta", "c0->c1 fica tudo na faixa 0");
+  igual(tipos[c.c2 + "<-" + c.c0], "curva", "c0->c2 desce de faixa");
+});
+
+teste("a faixa do commit não muda depois de um merge", function () {
+  var c = cenarioDivergente();
+  var antes = Layout.calcular(c.estado);
+  var depois = Layout.calcular(Repo.merge(c.estado, "feature").estado);
+  igual(acharNo(depois, c.c2).y, acharNo(antes, c.c2).y, "c2 não pode ter se mexido");
+  igual(acharNo(depois, c.c1).y, acharNo(antes, c.c1).y, "c1 não pode ter se mexido");
+});
+
+teste("órfãos vão para a faixa fantasma, abaixo de todas as outras", function () {
+  var e = tresCommits();
+  var r = Repo.reset(e, e.commits[0].id);
+  var l = Layout.calcular(r.estado);
+  var vivo = acharNo(l, e.commits[0].id);
+  var morto = acharNo(l, e.commits[2].id);
+  igual(morto.orfao, true);
+  igual(vivo.orfao, false);
+  verdade(morto.y > vivo.y, "a faixa fantasma fica abaixo de tudo");
+  verdade(l.faixas[l.faixas.length - 1].fantasma, "a última faixa é a fantasma");
+});
+
+teste("commit após reset: a aresta pai->filho não atravessa nenhum commit desenhado", function () {
+  var e = tresCommits();
+  e = Repo.reset(e, e.commits[0].id).estado;
+  e = Repo.commit(e, "c4").estado;
+  var l = Layout.calcular(e);
+
+  var aresta = null;
+  for (var i = 0; i < l.arestas.length; i++) {
+    if (l.arestas[i].para === e.commits[3].id) aresta = l.arestas[i];
+  }
+  verdade(aresta, "a aresta c1->c4 precisa existir");
+  igual(aresta.tipo, "reta");
+
+  // nenhum nó desenhado pode estar sobre o segmento
+  for (var j = 0; j < l.nos.length; j++) {
+    var n = l.nos[j];
+    if (n.id === aresta.de || n.id === aresta.para) continue;
+    var noSegmento = n.y === aresta.y1 && n.x > aresta.x1 && n.x < aresta.x2;
+    verdade(!noSegmento, "o commit " + n.mensagem + " está em cima da aresta");
+  }
+});
+
+teste("duas etiquetas no mesmo commit ficam ambas visíveis e não se sobrepõem", function () {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, false).estado;
+  var l = Layout.calcular(e);
+
+  igual(l.etiquetas.length, 2, "as duas branches precisam de etiqueta");
+  igual(l.etiquetas[0].commitId, l.etiquetas[1].commitId, "ancoradas no mesmo commit");
+  verdade(l.etiquetas[0].y !== l.etiquetas[1].y, "empilhadas, não sobrepostas");
+  igual(l.etiquetas[0].x, l.etiquetas[1].x, "mesma coluna");
+});
+
+teste("a etiqueta é ancorada no commit-ponta, não na faixa da branch", function () {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, false).estado;
+  var l = Layout.calcular(e);
+  var no = acharNo(l, e.commits[0].id);
+  // Limiar de meia faixa: rejeita sem ambiguidade a etiqueta desenhada em
+  // branch.faixa * ESPACO_Y (o bug que este teste existe para pegar) e aceita
+  // o deslocamento normal do empilhamento.
+  for (var i = 0; i < l.etiquetas.length; i++) {
+    verdade(Math.abs(l.etiquetas[i].y - no.y) < Layout.ESPACO_Y / 2,
+      "a etiqueta " + l.etiquetas[i].nome + " flutuou para longe do commit");
+  }
+});
+
+teste("exatamente uma etiqueta é marcada como HEAD", function () {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, true).estado;
+  var l = Layout.calcular(e);
+  var comHead = 0, nomeHead = null;
+  for (var i = 0; i < l.etiquetas.length; i++) {
+    if (l.etiquetas[i].ehHead) { comHead++; nomeHead = l.etiquetas[i].nome; }
+  }
+  igual(comHead, 1);
+  igual(nomeHead, "feature");
+});
+
+teste("nós carregam a cor da faixa e o emoji do autor", function () {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, true).estado;
+  e = Repo.commit(e, "c1").estado;
+  var l = Layout.calcular(e);
+  var n = acharNo(l, e.commits[1].id);
+  igual(n.cor, Repo.acharBranch(e, "feature").cor);
+  igual(n.emoji, "👩");
 });
 
 // ---------- executor no Node ----------
