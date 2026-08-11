@@ -12,17 +12,29 @@
   var LARGURA_MINIMA = 220;   // abaixo disto o campo de nome + emoji do painel Ações quebra
   var FRACAO_MAXIMA = 0.30;
 
-  function clampLargura(desejada, larguraJanela) {
-    // Sem uma janela válida não há teto a calcular.
-    if (typeof larguraJanela !== "number" || !isFinite(larguraJanela)) return LARGURA_MINIMA;
+  // Extraída de clampLargura para que aria-valuemin/aria-valuemax (em aplicar,
+  // mais abaixo) leiam os MESMOS piso/teto usados para travar a largura, em vez
+  // de reescrever `Math.min(220, larguraJanela * 0.30)` solto num segundo lugar
+  // — duas contas para o mesmo limite é como elas divergem silenciosamente.
+  function limitesLargura(larguraJanela) {
+    // Sem uma janela válida não há teto a calcular; os dois limites colapsam no
+    // piso nominal.
+    if (typeof larguraJanela !== "number" || !isFinite(larguraJanela)) {
+      return { piso: LARGURA_MINIMA, teto: LARGURA_MINIMA };
+    }
     var teto = larguraJanela * FRACAO_MAXIMA;
     // O piso CEDE quando a janela é estreita demais para bancá-lo. Travar as duas
     // barras em 220px numa janela de 600px deixaria o miolo com 144px — menor que
     // elas, quebrando a única promessa da feature. Cedendo junto, as duas ficam em
     // 30% e o miolo continua com ~40%.
     var piso = Math.min(LARGURA_MINIMA, teto);
-    if (typeof desejada !== "number" || !isFinite(desejada)) return piso;
-    return Math.max(piso, Math.min(desejada, teto));
+    return { piso: piso, teto: teto };
+  }
+
+  function clampLargura(desejada, larguraJanela) {
+    var limites = limitesLargura(larguraJanela);
+    if (typeof desejada !== "number" || !isFinite(desejada)) return limites.piso;
+    return Math.max(limites.piso, Math.min(desejada, limites.teto));
   }
 
   function pegar(id) { return document.getElementById(id); }
@@ -102,8 +114,18 @@
   function configurarDivisoria(alca, variavel, padrao, ehEsquerda, colunas, aoRedimensionar) {
     var pendente = false;
     var deslocamento = 0;
+    // Um elemento pode capturar vários ponteiros ao mesmo tempo (lousa digital,
+    // multitoque). Sem travar num só, um segundo dedo na mesma faixa de 8px
+    // dispararia outro pointerdown, sobrescreveria `deslocamento` e os dois
+    // pointermove disputariam a mesma variável CSS — e o primeiro pointerup
+    // soltaria cursor e realce enquanto o outro dedo ainda arrasta.
+    var ponteiroAtivo = null;
 
-    // Distância do cursor até a borda externa da janela do lado desta barra.
+    // Mede a partir de .colunas, não da janela: o teto em aplicar() usa
+    // window.innerWidth só porque .colunas hoje cobre a janela inteira (ver o
+    // comentário lá). Do lado direito o cursor se afasta da borda direita para
+    // AUMENTAR a barra — o sentido é o oposto do lado esquerdo — por isso o
+    // subtraendo troca de lado entre os dois ramos.
     function larguraCrua(clientX) {
       var caixa = colunas.getBoundingClientRect();
       return ehEsquerda ? clientX - caixa.left : caixa.right - clientX;
@@ -115,7 +137,26 @@
     }
 
     function aplicar(desejada) {
-      colunas.style.setProperty(variavel, clampLargura(desejada, window.innerWidth) + "px");
+      // O teto aqui vem de window.innerWidth, enquanto larguraCrua (acima) mede
+      // colunas.getBoundingClientRect(). Os dois só coincidem porque .colunas
+      // ocupa a janela inteira (body sem margem, .colunas sem padding nem
+      // borda). Se algum dia .colunas ganhar padding ou borda, a promessa do
+      // miolo maior passa a ser falsa em silêncio — clampLargura é pura e não
+      // enxerga o contêiner, então nenhum teste pegaria isso sozinho.
+      var largura = clampLargura(desejada, window.innerWidth);
+      colunas.style.setProperty(variavel, largura + "px");
+
+      // aria-valuenow é obrigatório num separator focalizável (é um "window
+      // splitter" pela ARIA): sem ele o leitor de tela anuncia só "separator",
+      // sem posição nem confirmação de que as setas moveram algo. piso/teto
+      // mudam com a largura da janela, então valuemin/valuemax são reescritos
+      // aqui, a cada aplicação — fixá-los uma vez ficaria errado no primeiro
+      // resize.
+      var limites = limitesLargura(window.innerWidth);
+      alca.setAttribute("aria-valuenow", Math.round(largura));
+      alca.setAttribute("aria-valuemin", Math.round(limites.piso));
+      alca.setAttribute("aria-valuemax", Math.round(limites.teto));
+
       // Um arraste dispara dezenas de pointermove por segundo. Uma vez por
       // quadro basta para o grafo parecer colado na divisória.
       if (pendente) return;
@@ -127,10 +168,19 @@
     }
 
     alca.addEventListener("pointerdown", function (ev) {
+      // Ignora um segundo ponteiro enquanto o primeiro ainda arrasta: só um
+      // arraste por vez faz sentido para uma única divisória.
+      if (ponteiroAtivo !== null) return;
+      ponteiroAtivo = ev.pointerId;
       ev.preventDefault();
       // Sem captura, um arraste rápido tira o cursor da faixa de 8px antes do
       // próximo evento e o gesto "escapa" no meio do caminho.
       alca.setPointerCapture(ev.pointerId);
+      // O preventDefault acima suprime o mousedown de compatibilidade e, com
+      // ele, a ação padrão de mover o foco. Sem este focus() explícito, depois
+      // de arrastar com o mouse o foco fica no <body> e as setas de ajuste fino
+      // não fazem nada.
+      alca.focus();
       alca.classList.add("arrastando");
       document.body.classList.add("redimensionando");
       // Guarda onde dentro da faixa o professor pegou, para a borda não pular
@@ -139,12 +189,14 @@
     });
 
     alca.addEventListener("pointermove", function (ev) {
-      if (!alca.hasPointerCapture(ev.pointerId)) return;
+      if (ev.pointerId !== ponteiroAtivo) return;
       aplicar(larguraCrua(ev.clientX) + deslocamento);
     });
 
     function soltar(ev) {
+      if (ev.pointerId !== ponteiroAtivo) return;
       if (alca.hasPointerCapture(ev.pointerId)) alca.releasePointerCapture(ev.pointerId);
+      ponteiroAtivo = null;
       alca.classList.remove("arrastando");
       document.body.classList.remove("redimensionando");
     }
@@ -403,6 +455,7 @@
     mostrarErro: mostrarErro,
     mostrarAviso: mostrarAviso,
     clampLargura: clampLargura,
+    limitesLargura: limitesLargura,
     montarDivisorias: montarDivisorias
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);

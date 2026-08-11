@@ -604,6 +604,17 @@ teste("clampLargura nunca devolve NaN", function () {
   igual(UI.clampLargura(300, undefined), 220, "janela ausente nao propaga NaN");
 });
 
+teste("limitesLargura expõe o mesmo piso/teto que clampLargura usa por baixo", function () {
+  // Janela larga: o teto de 30% sobra folga, então o piso fica travado no
+  // nominal de 220px.
+  igual(UI.limitesLargura(1920), { piso: 220, teto: 576 }, "1920px de janela dá teto de 576px e piso nominal");
+  // Janela estreita: 30% de 700 é 210, abaixo dos 220 nominais, e o piso cede
+  // para acompanhar — o mesmo regime que "clampLargura: em tela estreita o
+  // piso cede junto com o teto" já cobre, só que aqui expondo os dois números
+  // crus em vez do resultado do clamp.
+  igual(UI.limitesLargura(700), { piso: 210, teto: 210 }, "30% de 700 é 210, o piso cede para acompanhar");
+});
+
 teste("clampLargura garante o miolo maior que qualquer barra, em toda largura", function () {
   // A propriedade que a feature inteira existe para preservar. A lista cruza os
   // DOIS regimes: acima de ~733px manda o teto de 30%; abaixo, o piso cede e as
