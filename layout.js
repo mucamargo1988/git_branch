@@ -94,26 +94,23 @@
       var pontaId = ordemPonta[o];
       var grupo = porPonta[pontaId];
 
-      // Se algum nó está na mesma linha do commit-ponta e mais à direita dele,
-      // é porque a faixa da PARENTE seguiu crescendo depois que essa branch foi
-      // criada e ficou parada ali: ancorar a etiqueta no commit-ponta faria a
-      // pílula cobrir os commits que vieram depois. Nesse caso ela desce para a
-      // própria faixa — garantidamente vazia, já que uma branch só ganha
-      // commits na própria faixa, então se a ponta está em outra faixa é sinal
-      // de que ela nunca commitou nada. O conector (graph.js) passa a apontar
-      // de volta, na diagonal, para o commit onde a branch ficou — o que é
-      // exatamente o que mostra que ela não acompanhou quem seguiu em frente.
+      // A etiqueta desce para a própria faixa sempre que o commit-ponta está numa
+      // faixa que não é a dela. Uma branch só ganha commits na própria faixa, então
+      // ponta em outra faixa significa exatamente uma coisa: ela ainda não commitou
+      // nada. Isso acontece em dois momentos, e a mesma regra serve para os dois —
+      // a branch recém-criada, e a branch deixada para trás cuja mãe seguiu em
+      // frente.
+      //
+      // Nos dois casos a pílula na faixa própria, mais o conector diagonal que
+      // graph.js desenha de volta até o commit-ponta, dizem a mesma coisa: "aponto
+      // para lá, e é aqui que meus commits vão cair". Deixá-la empilhada em cima
+      // custaria duas coisas: na branch deixada para trás, a pílula cobriria os
+      // commits que vieram depois; na recém-criada, a faixa nasceria vazia, sem
+      // nada na tela que explicasse para que ela existe.
       var ficam = [];
       var descem = [];
       for (var g = 0; g < grupo.length; g++) {
-        var precisaDescer = false;
-        for (var ni = 0; ni < nos.length; ni++) {
-          if (nos[ni].y === pos[pontaId].y && nos[ni].x > pos[pontaId].x) {
-            precisaDescer = true;
-            break;
-          }
-        }
-        if (precisaDescer) descem.push(grupo[g]);
+        if (pos[pontaId].faixa !== grupo[g].faixa) descem.push(grupo[g]);
         else ficam.push(grupo[g]);
       }
 

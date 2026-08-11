@@ -485,15 +485,17 @@ teste("duas etiquetas no mesmo commit ficam ambas visíveis e não se sobrepõem
   igual(l.etiquetas[0].x, l.etiquetas[1].x, "mesma coluna");
 });
 
-teste("a etiqueta é ancorada no commit-ponta, não na faixa da branch", function () {
+teste("etiqueta de branch que já commitou fica colada no commit-ponta", function () {
   var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
-  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, false).estado;
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, true).estado;
+  e = Repo.commit(e, "c1").estado;
   var l = Layout.calcular(e);
-  var no = acharNo(l, e.commits[0].id);
-  // Limiar de meia faixa: rejeita sem ambiguidade a etiqueta desenhada em
-  // branch.faixa * ESPACO_Y (o bug que este teste existe para pegar) e aceita
-  // o deslocamento normal do empilhamento.
+  // Assim que a branch ganha commit próprio, a ponta passa a estar na faixa dela
+  // e a etiqueta não tem mais para onde descer: tem que ficar grudada no commit.
+  // O limiar de meia faixa rejeita sem ambiguidade uma etiqueta que flutuou para
+  // outra faixa e aceita o deslocamento normal do empilhamento.
   for (var i = 0; i < l.etiquetas.length; i++) {
+    var no = acharNo(l, l.etiquetas[i].commitId);
     verdade(Math.abs(l.etiquetas[i].y - no.y) < Layout.ESPACO_Y / 2,
       "a etiqueta " + l.etiquetas[i].nome + " flutuou para longe do commit");
   }
@@ -559,15 +561,28 @@ teste("etiqueta de branch deixada para tras nao cobre os commits seguintes", fun
   verdade(etLogin.y > etMaster.y, "login deve descer para a propria faixa");
 });
 
-teste("dois nomes um ponto: etiquetas seguem empilhadas quando nada veio depois", function () {
+teste("branch recem-criada desce para a propria faixa em vez de deixa-la vazia", function () {
   var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
   e = Repo.criarBranch(e, "login", { nome: "Ana", emoji: "👩" }, false).estado;
   var l = Layout.calcular(e);
   igual(l.etiquetas.length, 2);
-  igual(l.etiquetas[0].x, l.etiquetas[1].x, "mesma coluna");
-  verdade(l.etiquetas[0].y !== l.etiquetas[1].y, "empilhadas, nao sobrepostas");
-  verdade(Math.abs(l.etiquetas[0].y - l.etiquetas[1].y) < Layout.ESPACO_Y / 2,
-    "as duas continuam juntas no mesmo commit");
+
+  var etLogin = null, etMaster = null;
+  for (var i = 0; i < l.etiquetas.length; i++) {
+    if (l.etiquetas[i].nome === "login") etLogin = l.etiquetas[i];
+    if (l.etiquetas[i].nome === "master") etMaster = l.etiquetas[i];
+  }
+
+  // O x não muda: é isso que faz graph.js desenhar o conector apontando de volta
+  // na diagonal, e é o conector que mostra que as duas apontam para o MESMO
+  // commit — trabalho que antes era feito pela simples adjacência das pílulas.
+  igual(etLogin.x, etMaster.x, "mesma coluna");
+  igual(etLogin.commitId, etMaster.commitId, "as duas continuam ancoradas no mesmo commit");
+  igual(etLogin.y - etMaster.y, Layout.ESPACO_Y,
+    "login desce uma faixa inteira, para a faixa que e dela");
+
+  // A master ja tem o commit na propria faixa, entao nao desce junto.
+  igual(etMaster.y, acharNo(l, etMaster.commitId).y, "master fica colada no commit");
 });
 
 // ---------- ui.js: largura das barras laterais ----------
