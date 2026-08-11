@@ -195,6 +195,89 @@ teste("checkout para branch inexistente ou para a branch atual é rejeitado", fu
   igual(Repo.checkout(e, "master").ok, false);
 });
 
+// ---------- repo.js: ancestralidade e merge ----------
+
+// master: c0 -> c1 ; feature: nasce em c0 e ganha c2
+// Devolve { estado, c0, c1, c2 }
+function cenarioDivergente() {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  var c0 = e.commits[0].id;
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, true).estado;
+  e = Repo.commit(e, "c2").estado;
+  var c2 = e.commits[1].id;
+  e = Repo.checkout(e, "master").estado;
+  e = Repo.commit(e, "c1").estado;
+  var c1 = e.commits[2].id;
+  return { estado: e, c0: c0, c1: c1, c2: c2 };
+}
+
+teste("ehAncestral reconhece a cadeia de pais", function () {
+  var c = cenarioDivergente();
+  verdade(Repo.ehAncestral(c.estado, c.c0, c.c1), "c0 é ancestral de c1");
+  verdade(Repo.ehAncestral(c.estado, c.c0, c.c2), "c0 é ancestral de c2");
+  verdade(!Repo.ehAncestral(c.estado, c.c1, c.c2), "c1 e c2 são irmãos, não ancestrais");
+  verdade(Repo.ehAncestral(c.estado, c.c1, c.c1), "um commit é ancestral de si mesmo");
+});
+
+teste("merge fast-forward: só anda a etiqueta, sem criar commit", function () {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, true).estado;
+  e = Repo.commit(e, "c1").estado;
+  var pontaFeature = Repo.acharBranch(e, "feature").pontaId;
+  e = Repo.checkout(e, "master").estado;
+
+  var r = Repo.merge(e, "feature");
+  verdade(r.ok, r.erro);
+  igual(r.tipo, "fast-forward");
+  igual(r.estado.commits.length, 2, "fast-forward NÃO cria commit");
+  igual(Repo.acharBranch(r.estado, "master").pontaId, pontaFeature, "a etiqueta pulou para a ponta da feature");
+  igual(r.comando, "git merge feature");
+});
+
+teste("merge com os dois lados avançados cria commit de merge com dois pais", function () {
+  var c = cenarioDivergente();
+  var r = Repo.merge(c.estado, "feature");
+  verdade(r.ok, r.erro);
+  igual(r.tipo, "commit-de-merge");
+  igual(r.estado.commits.length, 4, "os 3 originais mais o de merge");
+  var m = r.estado.commits[3];
+  igual(m.pais, [c.c1, c.c2], "primeiro pai é a branch atual, segundo é a origem");
+  igual(m.faixa, 0, "o commit de merge nasce na faixa da branch de destino");
+  igual(Repo.acharBranch(r.estado, "master").pontaId, m.id);
+});
+
+teste("merge sem nada a trazer avisa Already up to date e não cria commit", function () {
+  var e = Repo.commit(Repo.estadoInicial(), "c0").estado;
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, false).estado;
+  e = Repo.commit(e, "c1").estado; // avança só a master
+
+  var r = Repo.merge(e, "feature");
+  verdade(r.ok, r.erro);
+  igual(r.tipo, "atualizado");
+  igual(r.estado.commits.length, 2, "não pode criar commit");
+  igual(r.aviso, "Already up to date.");
+  igual(r.estado.historico[r.estado.historico.length - 1].comando, "git merge feature",
+    "o comando entra no histórico mesmo assim, porque é o que o Git faz");
+});
+
+teste("merge funciona no sentido inverso: master dentro da feature", function () {
+  var c = cenarioDivergente();
+  var e = Repo.checkout(c.estado, "feature").estado;
+  var r = Repo.merge(e, "master");
+  verdade(r.ok, r.erro);
+  igual(r.tipo, "commit-de-merge");
+  var m = r.estado.commits[3];
+  igual(m.pais, [c.c2, c.c1], "agora a feature é o primeiro pai");
+  igual(m.faixa, 1, "nasce na faixa da feature, que é o destino");
+  igual(Repo.acharBranch(r.estado, "feature").pontaId, m.id);
+});
+
+teste("merge de uma branch nela mesma ou inexistente é rejeitado", function () {
+  var c = cenarioDivergente();
+  igual(Repo.merge(c.estado, "master").ok, false);
+  igual(Repo.merge(c.estado, "nao-existe").ok, false);
+});
+
 // ---------- executor no Node ----------
 
 if (typeof window === "undefined") {

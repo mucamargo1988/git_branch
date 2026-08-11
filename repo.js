@@ -182,6 +182,84 @@
     return { ok: true, estado: e, comando: comando };
   }
 
+  // Percorre a cadeia de pais e devolve o conjunto de ids alcançáveis,
+  // incluindo o próprio commitId.
+  function alcancaveis(estado, commitId) {
+    var vistos = {};
+    var pilha = commitId ? [commitId] : [];
+    while (pilha.length > 0) {
+      var id = pilha.pop();
+      if (!id || vistos[id]) continue;
+      vistos[id] = true;
+      var c = acharCommit(estado, id);
+      if (c) {
+        for (var i = 0; i < c.pais.length; i++) pilha.push(c.pais[i]);
+      }
+    }
+    return vistos;
+  }
+
+  function ehAncestral(estado, idA, idB) {
+    if (!idA || !idB) return false;
+    return alcancaveis(estado, idB)[idA] === true;
+  }
+
+  function merge(estado, nomeOrigem) {
+    var origem = acharBranch(estado, nomeOrigem);
+    if (!origem) {
+      return { ok: false, erro: "A branch " + nomeOrigem + " não existe." };
+    }
+    var atual = branchAtual(estado);
+    if (origem.nome === atual.nome) {
+      return { ok: false, erro: "Não dá para mesclar uma branch nela mesma." };
+    }
+    if (!origem.pontaId) {
+      return { ok: false, erro: "A branch " + nomeOrigem + " ainda não tem commits." };
+    }
+
+    var comando = "git merge " + nomeOrigem;
+
+    // Nada a trazer: a ponta da origem já faz parte da história da branch atual.
+    if (atual.pontaId && ehAncestral(estado, origem.pontaId, atual.pontaId)) {
+      var eA = clonar(estado);
+      registrar(eA, comando);
+      return {
+        ok: true, estado: eA, comando: comando,
+        tipo: "atualizado", aviso: "Already up to date."
+      };
+    }
+
+    // Fast-forward: a branch atual não andou desde a ramificação.
+    if (!atual.pontaId || ehAncestral(estado, atual.pontaId, origem.pontaId)) {
+      var eF = clonar(estado);
+      acharBranch(eF, atual.nome).pontaId = origem.pontaId;
+      registrar(eF, comando);
+      return {
+        ok: true, estado: eF, comando: comando,
+        tipo: "fast-forward", aviso: "Fast-forward: a etiqueta só andou para frente."
+      };
+    }
+
+    // Os dois lados avançaram: nasce um commit com dois pais.
+    var e = clonar(estado);
+    var destino = branchAtual(e);
+    var id = gerarId(e.proximoId);
+
+    e.commits.push({
+      id: id,
+      mensagem: "Merge branch '" + nomeOrigem + "' into " + destino.nome,
+      pais: [destino.pontaId, origem.pontaId],
+      autorId: destino.donoId,
+      faixa: destino.faixa,
+      ordem: e.proximoId - 1
+    });
+    e.proximoId = e.proximoId + 1;
+    destino.pontaId = id;
+
+    registrar(e, comando);
+    return { ok: true, estado: e, comando: comando, tipo: "commit-de-merge" };
+  }
+
   raiz.Repo = {
     CORES: CORES,
     gerarId: gerarId,
@@ -193,6 +271,9 @@
     commit: commit,
     registrarDev: registrarDev,
     criarBranch: criarBranch,
-    checkout: checkout
+    checkout: checkout,
+    alcancaveis: alcancaveis,
+    ehAncestral: ehAncestral,
+    merge: merge
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
