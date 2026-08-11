@@ -482,6 +482,12 @@ git commit -m "Torna as barras laterais arrastaveis, com teclado e reset"
 
 - [ ] **Step 1: Verificar o arraste com Playwright**
 
+**Duas restrições do ambiente, ambas já verificadas nesta sessão — respeite as duas ou o teste falha por artefato, não por defeito do código:**
+
+1. **`file://` está bloqueado no navegador controlado.** Use o servidor estático local em `http://localhost:8321` (o script está em `scratchpad/servidor.js`; ele serve a pasta do projeto, inclusive `branches-na-pratica.html`).
+
+2. **Não dispare `PointerEvent` sintético via `evaluate`.** O handler chama `setPointerCapture(ev.pointerId)`, e um `pointerId` de evento fabricado não corresponde a um ponteiro ativo: o navegador lança `NotFoundError`, o handler morre antes de aplicar a classe `arrastando`, e o arraste parece quebrado com o código correto. Use injeção real de input — `page.mouse.move` / `mouse.down` / `mouse.move({steps})` / `mouse.up` — que cria um ponteiro de verdade e faz a captura funcionar.
+
 Automatizar as checagens 1, 3 e 2 do Step 5 anterior. O ponto crítico é o terceiro: medir as três colunas depois de um arraste ao extremo e confirmar que o miolo ainda é o maior, e que a escala do SVG mudou (prova de que `reajustar` correu).
 
 Medição, rodada antes e depois de cada arraste:
@@ -522,7 +528,9 @@ Esperado: `branches-na-pratica.html gerado (NN KB)`. O script sai com erro se so
 
 - [ ] **Step 4: Conferir que o arquivo único também funciona**
 
-Abrir `branches-na-pratica.html` direto no navegador (não pelo servidor) e repetir as checagens 1, 3 e 6 do Step 5 da Task 3. Este é o arquivo que vai para os alunos; ele precisa ser testado como artefato, não presumido correto.
+Abrir `http://localhost:8321/branches-na-pratica.html` e repetir as checagens 1, 3 e 6 do Step 5 da Task 3. Este é o arquivo que vai para os alunos; ele precisa ser testado como artefato, não presumido correto.
+
+O professor vai abri-lo por duplo clique, ou seja, em `file://` — que o navegador controlado bloqueia. O que o servidor não consegue provar é justamente isso, então confirme por leitura que o arquivo não tem nenhuma referência externa (o próprio `gerar-arquivo-unico.js` já falha se sobrar alguma) e registre no relatório que a abertura por `file://` não pôde ser exercitada aqui.
 
 - [ ] **Step 5: Commit**
 
