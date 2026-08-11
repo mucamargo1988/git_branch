@@ -278,6 +278,62 @@ teste("merge de uma branch nela mesma ou inexistente é rejeitado", function () 
   igual(Repo.merge(c.estado, "nao-existe").ok, false);
 });
 
+// ---------- repo.js: reset e órfãos ----------
+
+function tresCommits() {
+  var e = Repo.commit(Repo.estadoInicial(), "c1").estado;
+  e = Repo.commit(e, "c2").estado;
+  e = Repo.commit(e, "c3").estado;
+  return e;
+}
+
+teste("reset move a ponta para trás e registra o comando", function () {
+  var e = tresCommits();
+  var c1 = e.commits[0].id;
+  var r = Repo.reset(e, c1);
+  verdade(r.ok, r.erro);
+  igual(Repo.acharBranch(r.estado, "master").pontaId, c1);
+  igual(r.estado.commits.length, 3, "os commits continuam existindo, só ficaram órfãos");
+  igual(r.comando, "git reset --hard " + c1);
+});
+
+teste("reset deixa os commits posteriores órfãos", function () {
+  var e = tresCommits();
+  igual(Repo.orfaos(e), [], "sem reset não há órfãos");
+  var r = Repo.reset(e, e.commits[0].id);
+  igual(Repo.orfaos(r.estado), [e.commits[1].id, e.commits[2].id]);
+});
+
+teste("commit órfão alcançável por outra branch não conta como órfão", function () {
+  var e = tresCommits();
+  e = Repo.criarBranch(e, "salva", { nome: "Ana", emoji: "👩" }, false).estado;
+  var r = Repo.reset(e, e.commits[0].id);
+  igual(Repo.orfaos(r.estado), [], "a branch salva ainda segura c2 e c3");
+});
+
+teste("reset para commit fora do histórico da branch atual é rejeitado", function () {
+  var c = cenarioDivergente(); // estamos na master; c2 é da feature
+  igual(Repo.reset(c.estado, c.c2).ok, false);
+  igual(Repo.reset(c.estado, "nao-existe").ok, false);
+});
+
+teste("reset para a própria ponta atual é rejeitado", function () {
+  var e = tresCommits();
+  igual(Repo.reset(e, e.commits[2].id).ok, false);
+});
+
+teste("commitsAlcancaveis lista do mais novo ao mais antigo, sem a ponta atual", function () {
+  var e = tresCommits();
+  igual(Repo.commitsAlcancaveis(e), [
+    { id: e.commits[1].id, mensagem: "c2" },
+    { id: e.commits[0].id, mensagem: "c1" }
+  ]);
+});
+
+teste("commitsAlcancaveis em repositório vazio devolve lista vazia", function () {
+  igual(Repo.commitsAlcancaveis(Repo.estadoInicial()), []);
+});
+
 // ---------- executor no Node ----------
 
 if (typeof window === "undefined") {

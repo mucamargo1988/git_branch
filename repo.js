@@ -260,6 +260,57 @@
     return { ok: true, estado: e, comando: comando, tipo: "commit-de-merge" };
   }
 
+  function reset(estado, commitId) {
+    var atual = branchAtual(estado);
+    if (!acharCommit(estado, commitId)) {
+      return { ok: false, erro: "Esse commit não existe." };
+    }
+    if (commitId === atual.pontaId) {
+      return { ok: false, erro: "Você já está nesse commit." };
+    }
+    if (!alcancaveis(estado, atual.pontaId)[commitId]) {
+      return { ok: false, erro: "Esse commit não faz parte do histórico de " + atual.nome + "." };
+    }
+
+    var e = clonar(estado);
+    acharBranch(e, atual.nome).pontaId = commitId;
+    var comando = "git reset --hard " + commitId;
+    registrar(e, comando);
+    return { ok: true, estado: e, comando: comando };
+  }
+
+  // Commits que nenhuma branch alcança mais. São desenhados na faixa fantasma.
+  function orfaos(estado) {
+    var vivos = {};
+    for (var i = 0; i < estado.branches.length; i++) {
+      var alc = alcancaveis(estado, estado.branches[i].pontaId);
+      for (var id in alc) {
+        if (Object.prototype.hasOwnProperty.call(alc, id)) vivos[id] = true;
+      }
+    }
+    var lista = [];
+    for (var j = 0; j < estado.commits.length; j++) {
+      if (!vivos[estado.commits[j].id]) lista.push(estado.commits[j].id);
+    }
+    return lista;
+  }
+
+  // Alimenta o dropdown de reset: histórico da branch atual, do mais novo para o
+  // mais antigo, sem a ponta atual (resetar para ela seria um comando sem efeito).
+  function commitsAlcancaveis(estado) {
+    var atual = branchAtual(estado);
+    if (!atual || !atual.pontaId) return [];
+    var alc = alcancaveis(estado, atual.pontaId);
+    var lista = [];
+    for (var i = estado.commits.length - 1; i >= 0; i--) {
+      var c = estado.commits[i];
+      if (alc[c.id] && c.id !== atual.pontaId) {
+        lista.push({ id: c.id, mensagem: c.mensagem });
+      }
+    }
+    return lista;
+  }
+
   raiz.Repo = {
     CORES: CORES,
     gerarId: gerarId,
@@ -274,6 +325,9 @@
     checkout: checkout,
     alcancaveis: alcancaveis,
     ehAncestral: ehAncestral,
-    merge: merge
+    merge: merge,
+    reset: reset,
+    orfaos: orfaos,
+    commitsAlcancaveis: commitsAlcancaveis
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
