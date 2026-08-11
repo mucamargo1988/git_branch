@@ -177,7 +177,7 @@ atual.
 | **Nova branch** | nome, dono (nome + emoji), ☑ "já mudar pra ela" | `git branch x` ou `git checkout -b x` | Curva desce do commit atual para uma faixa nova em outra cor. O dono aparece no painel EQUIPE, posicionado na ponta da linha dele. |
 | **Checkout** | dropdown de branches | `git checkout x` | `HEAD` salta para a outra etiqueta com destaque. Faixa ativa acende, as demais esmaecem. Avatar da barra superior troca. |
 | **Merge** | dropdown "mesclar X na atual" | `git merge x` | Fast-forward ou commit de merge (ver abaixo). |
-| **Reset** | dropdown de commits alcançáveis a partir do `HEAD` | `git reset --hard <sha>` | A etiqueta desliza **para trás**. Commits que ficaram inalcançáveis viram cinza tracejado — permanecem desenhados, para o professor poder falar sobre eles. |
+| **Reset** | dropdown de commits alcançáveis a partir do `HEAD` | `git reset --hard <sha>` | A etiqueta desliza **para trás**. Commits que ficaram inalcançáveis descem para a faixa fantasma em cinza tracejado — permanecem desenhados, para o professor poder falar sobre eles. |
 
 ### Os dois merges
 
@@ -214,6 +214,39 @@ Determinístico, sem biblioteca de grafos.
   que o desenho inteiro se reorganize após um merge, o que faria o aluno perder o fio.
 - Aresta entre commits na mesma faixa: linha reta. Entre faixas diferentes: curva
   de Bézier.
+
+### Faixa fantasma: commits órfãos após `reset`
+
+Sem uma regra explícita, `reset` seguido de `commit` quebra o desenho. Exemplo:
+`c1 c2 c3` na faixa 0; `git reset --hard c1` deixa `c2` e `c3` órfãos mas ainda na
+faixa 0; o commit seguinte `c4` nasce na faixa 0 com X maior que os dois. A aresta
+`c1 → c4` atravessaria `c2` e `c3` em linha reta, e a faixa 0 passaria a intercalar
+história viva e história morta na mesma linha. No projetor isso lê como defeito de
+renderização, não como lição.
+
+**Regra:** ao ficarem inalcançáveis, os commits órfãos **migram para uma faixa
+fantasma própria**, desenhada abaixo de todas as demais, em cinza tracejado e com
+rótulo *"commits abandonados"*. Eles preservam suas arestas entre si, saem do caminho
+da história viva e continuam visíveis para o professor comentar.
+
+Esta é a única situação em que a faixa de um commit muda depois de criado.
+
+### Etiquetas: âncora e empilhamento
+
+`branch.faixa` determina apenas **onde nascem os commits futuros** daquela branch.
+Ela **não** determina onde a etiqueta é desenhada.
+
+**Regra:** a etiqueta é sempre ancorada na posição do commit-ponta da branch.
+
+Isso importa desde o primeiro minuto de aula: `git branch feature/login` sem checkout
+deixa `master` e `feature/login` apontando para o **mesmo** commit. Quando duas ou
+mais etiquetas compartilham um commit, elas **empilham verticalmente** na ordem de
+criação, ligadas ao mesmo círculo, e o marcador `HEAD` destaca aquela para a qual
+aponta.
+
+Este é o melhor momento didático do app inteiro para "branch é ponteiro, não cópia":
+dois nomes, um único ponto, nenhuma cópia. Deve ser implementado como recurso
+deliberado, não como caso de borda.
 
 **Ajuste ao projetor:** o SVG usa `viewBox` e se reescala para caber na área. Ao
 atingir um tamanho mínimo legível, para de encolher e passa a rolar na horizontal,
@@ -269,7 +302,12 @@ Casos cobertos:
 - Reset move a ponta para trás e marca os commits órfãos
 - Ancestralidade e ancestral comum
 - Colisão de nome de branch é rejeitada
+- `git branch x` sem checkout: não move `HEAD`, não cria commit, e deixa duas
+  branches apontando para o mesmo commit
 - Layout: faixa do commit não muda após merge; X segue a ordem de criação
+- Layout: commit após `reset` — a aresta pai→filho não atravessa nenhum commit
+  desenhado (órfãos migraram para a faixa fantasma)
+- Layout: duas etiquetas no mesmo commit ficam ambas visíveis e não se sobrepõem
 
 ## Entrega
 
@@ -283,3 +321,7 @@ em casa. A versão em arquivo único é derivada da pasta; a pasta é a fonte da
 
 Interface e mensagens em português. Comandos Git permanecem em inglês
 (`git checkout -b`), porque é o que o aluno vai digitar de verdade.
+
+A branch inicial se chama `master`, conforme pedido. Como o GitHub hoje cria `main`
+por padrão, o painel EQUIPE traz uma nota discreta: *"no GitHub, essa branch costuma
+se chamar `main`"* — evita que o aluno estranhe ao abrir um repositório real.
