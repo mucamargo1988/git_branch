@@ -282,7 +282,12 @@ input[type="text"]:focus, select:focus {
 /* Texto ESCURO sobre a pílula clara. As cores de branch no tema escuro são
    claras e saturadas; texto branco em cima delas teria contraste baixo. */
 .etiqueta-texto { font-size: 15px; font-weight: 700; fill: #0f172a; dominant-baseline: central; }
-.etiqueta-linha { stroke-width: 2; }
+/* fill: none não é enfeite: este conector era um <line>, que não tem área para
+   preencher, e virou um <path> para poder curvar. Sem isto o navegador pinta o
+   interior da curva com a cor da branch e a etiqueta ganha um borrão atrás.
+   A transição de d faz a curva acompanhar a pílula quando ela desliza, em vez
+   de saltar para a forma nova enquanto o resto anima. */
+.etiqueta-linha { fill: none; stroke-width: 2; transition: d 300ms ease; }
 .marca-head {
   font-size: 13px; font-weight: 800; fill: var(--texto); dominant-baseline: central;
 }
@@ -334,7 +339,7 @@ input[type="text"]:focus, select:focus {
 .area-grafo::-webkit-scrollbar-corner { background: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
-  .aresta, .no, .etiqueta { transition: none; }
+  .aresta, .no, .etiqueta, .etiqueta-linha { transition: none; }
 }
 
 </style>
@@ -1141,7 +1146,7 @@ input[type="text"]:focus, select:focus {
       if (!item) {
         item = {
           g: criar("g", { "class": "etiqueta" }),
-          linha: criar("line", { "class": "etiqueta-linha", x2: 0, y2: 0 }),
+          linha: criar("path", { "class": "etiqueta-linha" }),
           fundo: criar("rect", { "class": "etiqueta-fundo", y: -13, height: 26 }),
           texto: criar("text", { "class": "etiqueta-texto", x: 11, y: 1 }),
           head: criar("text", { "class": "marca-head", y: 1 })
@@ -1162,8 +1167,21 @@ input[type="text"]:focus, select:focus {
 
       // Conector até o commit, em coordenadas locais do <g>. Deixa explícito em
       // qual bolinha a etiqueta está grudada.
-      item.linha.setAttribute("x1", layoutXdoCommit(layout, e.commitId) - e.x);
-      item.linha.setAttribute("y1", layoutYdoCommit(layout, e.commitId) - e.y);
+      //
+      // Mesma Bézier das arestas entre commits: sai na horizontal da bolinha e
+      // chega na horizontal da pílula. Vale a pena ser a mesma curva, e não uma
+      // reta diagonal: o aluno já aprendeu, nas arestas, que essa forma quer
+      // dizer "isto liga aquilo" — o conector da etiqueta passa a dizer a mesma
+      // coisa com o mesmo desenho.
+      //
+      // Quando a etiqueta está na mesma linha do commit, os dois y são iguais e
+      // a curva degenera sozinha numa reta horizontal, sem caso especial.
+      var cx = layoutXdoCommit(layout, e.commitId) - e.x;
+      var cy = layoutYdoCommit(layout, e.commitId) - e.y;
+      var meioX = cx / 2;
+      item.linha.setAttribute("d",
+        "M " + cx + " " + cy +
+        " C " + meioX + " " + cy + ", " + meioX + " 0, 0 0");
       item.linha.setAttribute("stroke", e.cor);
 
       item.fundo.setAttribute("x", 0);

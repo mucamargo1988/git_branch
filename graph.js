@@ -136,7 +136,7 @@
       if (!item) {
         item = {
           g: criar("g", { "class": "etiqueta" }),
-          linha: criar("line", { "class": "etiqueta-linha", x2: 0, y2: 0 }),
+          linha: criar("path", { "class": "etiqueta-linha" }),
           fundo: criar("rect", { "class": "etiqueta-fundo", y: -13, height: 26 }),
           texto: criar("text", { "class": "etiqueta-texto", x: 11, y: 1 }),
           head: criar("text", { "class": "marca-head", y: 1 })
@@ -157,8 +157,21 @@
 
       // Conector até o commit, em coordenadas locais do <g>. Deixa explícito em
       // qual bolinha a etiqueta está grudada.
-      item.linha.setAttribute("x1", layoutXdoCommit(layout, e.commitId) - e.x);
-      item.linha.setAttribute("y1", layoutYdoCommit(layout, e.commitId) - e.y);
+      //
+      // Mesma Bézier das arestas entre commits: sai na horizontal da bolinha e
+      // chega na horizontal da pílula. Vale a pena ser a mesma curva, e não uma
+      // reta diagonal: o aluno já aprendeu, nas arestas, que essa forma quer
+      // dizer "isto liga aquilo" — o conector da etiqueta passa a dizer a mesma
+      // coisa com o mesmo desenho.
+      //
+      // Quando a etiqueta está na mesma linha do commit, os dois y são iguais e
+      // a curva degenera sozinha numa reta horizontal, sem caso especial.
+      var cx = layoutXdoCommit(layout, e.commitId) - e.x;
+      var cy = layoutYdoCommit(layout, e.commitId) - e.y;
+      var meioX = cx / 2;
+      item.linha.setAttribute("d",
+        "M " + cx + " " + cy +
+        " C " + meioX + " " + cy + ", " + meioX + " 0, 0 0");
       item.linha.setAttribute("stroke", e.cor);
 
       item.fundo.setAttribute("x", 0);

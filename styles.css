@@ -275,7 +275,12 @@ input[type="text"]:focus, select:focus {
 /* Texto ESCURO sobre a pílula clara. As cores de branch no tema escuro são
    claras e saturadas; texto branco em cima delas teria contraste baixo. */
 .etiqueta-texto { font-size: 15px; font-weight: 700; fill: #0f172a; dominant-baseline: central; }
-.etiqueta-linha { stroke-width: 2; }
+/* fill: none não é enfeite: este conector era um <line>, que não tem área para
+   preencher, e virou um <path> para poder curvar. Sem isto o navegador pinta o
+   interior da curva com a cor da branch e a etiqueta ganha um borrão atrás.
+   A transição de d faz a curva acompanhar a pílula quando ela desliza, em vez
+   de saltar para a forma nova enquanto o resto anima. */
+.etiqueta-linha { fill: none; stroke-width: 2; transition: d 300ms ease; }
 .marca-head {
   font-size: 13px; font-weight: 800; fill: var(--texto); dominant-baseline: central;
 }
@@ -327,5 +332,5 @@ input[type="text"]:focus, select:focus {
 .area-grafo::-webkit-scrollbar-corner { background: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
-  .aresta, .no, .etiqueta { transition: none; }
+  .aresta, .no, .etiqueta, .etiqueta-linha { transition: none; }
 }
