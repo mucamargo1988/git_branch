@@ -36,7 +36,15 @@ Estas regras valem para **todas** as tarefas.
 - **Nenhum `alert()`, `confirm()` ou `prompt()` do navegador**, com uma única exceção: o `confirm()` do botão Reiniciar (Task 10).
 - **A branch inicial se chama `master`** (pedido explícito do professor), com a nota de interface sobre `main` prevista na Task 9.
 - **Sem conflitos de merge.** Merge sempre dá certo. Commits não têm arquivos nem conteúdo.
-- **Toda mensagem visível ao usuário em português**, sem jargão desnecessário, exceto os textos que o Git real produz e que o aluno vai reconhecer: `Fast-forward` e `Already up to date.`
+- **Toda mensagem visível ao usuário em português**, sem jargão desnecessário, exceto os
+  textos que o Git real produz e que o aluno vai reconhecer, que ficam em inglês de
+  propósito. São exatamente três:
+  1. `Fast-forward`
+  2. `Already up to date.`
+  3. a mensagem do commit de merge: `Merge branch '<origem>' into <destino>`
+
+  O aluno vai ver essas mesmas palavras no terminal de verdade; traduzi-las tornaria o
+  app menos útil, não mais.
 
 ---
 
