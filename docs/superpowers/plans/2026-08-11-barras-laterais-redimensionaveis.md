@@ -535,6 +535,8 @@ No fim de `styles.css`, **antes** do bloco `@media (prefers-reduced-motion: redu
 
 Confirmar também que `.area-grafo` continua rolando de fato — trilha transparente não pode virar "não rola".
 
+**Não afirme nada sobre os valores do bloco `::-webkit-scrollbar`.** No Chromium, ter `scrollbar-width`/`scrollbar-color` definidos faz o bloco webkit ser ignorado — comportamento documentado, e é o desenhado: as propriedades padrão entregam a barra fina, e o bloco webkit é só o fallback para motores antigos. Uma asserção nos 9px ou em qualquer estilo computado de `::-webkit-scrollbar` falharia por artefato do ambiente, não por defeito. Verifique pelo valor computado de `scrollbar-width` e pelo olho: fina, trilha invisível, polegar achável.
+
 - [ ] **Step 3: Commit**
 
 ```bash
@@ -562,7 +564,13 @@ git commit -m "Deixa as barras de rolagem discretas"
 
 2. **Não dispare `PointerEvent` sintético via `evaluate`.** O handler chama `setPointerCapture(ev.pointerId)`, e um `pointerId` de evento fabricado não corresponde a um ponteiro ativo: o navegador lança `NotFoundError`, o handler morre antes de aplicar a classe `arrastando`, e o arraste parece quebrado com o código correto. Use injeção real de input — `page.mouse.move` / `mouse.down` / `mouse.move({steps})` / `mouse.up` — que cria um ponteiro de verdade e faz a captura funcionar.
 
-Automatizar as checagens 1, 3 e 2 do Step 5 anterior. O ponto crítico é o terceiro: medir as três colunas depois de um arraste ao extremo e confirmar que o miolo ainda é o maior, e que a escala do SVG mudou (prova de que `reajustar` correu).
+Antes de arrastar, criar dois ou três commits e uma branch pelos botões do app, para o grafo ter conteúdo — com o repositório vazio o SVG não tem escala a mudar e a checagem do `reajustar` não prova nada.
+
+As três checagens a automatizar:
+
+1. **Arraste normal.** Arrastar a divisória esquerda ~200px para a direita: a coluna esquerda cresce, a do meio encolhe, e a soma continua fechando com a largura da janela.
+2. **`reajustar` correu.** O `transform` do `#grafo` mudou entre antes e depois do arraste. Esta é a prova de que o SVG não ficou na escala antiga — o defeito que o callback existe para evitar.
+3. **A promessa, no extremo.** Arrastar a divisória esquerda ~2000px para a direita (bem além do limite): a coluna esquerda trava em 30% da janela, e a do meio continua sendo a maior das três. Repetir para a divisória direita.
 
 Medição, rodada antes e depois de cada arraste:
 
@@ -602,7 +610,12 @@ Esperado: `branches-na-pratica.html gerado (NN KB)`. O script sai com erro se so
 
 - [ ] **Step 4: Conferir que o arquivo único também funciona**
 
-Abrir `http://localhost:8321/branches-na-pratica.html` e repetir as checagens 1, 3 e 6 do Step 5 da Task 3. Este é o arquivo que vai para os alunos; ele precisa ser testado como artefato, não presumido correto.
+Abrir `http://localhost:8321/branches-na-pratica.html`. Este é o arquivo que vai para os alunos; ele precisa ser testado como artefato, não presumido correto. Repetir nele:
+
+1. **Arraste normal** — arrastar a divisória esquerda alarga a coluna esquerda, e a borda acompanha o cursor sem pular no primeiro pixel.
+2. **A promessa no extremo** — arrastando bem além do limite, a barra trava em 30% da janela e a coluna do meio continua a maior.
+3. **Reset** — duplo clique na divisória esquerda devolve os 300px sem mexer na largura da direita.
+4. **A barra de rolagem** — fina e discreta nas três áreas que rolam, como na versão em pasta.
 
 O professor vai abri-lo por duplo clique, ou seja, em `file://` — que o navegador controlado bloqueia. O que o servidor não consegue provar é justamente isso, então confirme por leitura que o arquivo não tem nenhuma referência externa (o próprio `gerar-arquivo-unico.js` já falha se sobrar alguma) e registre no relatório que a abertura por `file://` não pôde ser exercitada aqui.
 
