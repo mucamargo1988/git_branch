@@ -304,6 +304,10 @@ Criar `repo.js`:
     return acharBranch(estado, estado.HEAD.branch);
   }
 
+  // Muta o estado recebido de propósito: só é chamada de dentro das operações
+  // (commit, criarBranch, checkout, merge, reset), que já trabalham sobre um clone.
+  // Por isso fica privada ao módulo — publicá-la seria expor uma pré-condição
+  // perigosa como API.
   function registrar(estado, comando) {
     estado.historico.push({ n: estado.historico.length + 1, comando: comando });
   }
@@ -315,8 +319,7 @@ Criar `repo.js`:
     clonar: clonar,
     acharBranch: acharBranch,
     acharCommit: acharCommit,
-    branchAtual: branchAtual,
-    registrar: registrar
+    branchAtual: branchAtual
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
 ```
