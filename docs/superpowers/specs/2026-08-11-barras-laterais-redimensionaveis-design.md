@@ -130,10 +130,22 @@ tratamento explícito, o SVG ficaria na escala antiga — sobrando ou faltando e
 até a próxima ação.
 
 Portanto o arraste dispara o recálculo, agendado por `requestAnimationFrame` para não
-recalcular o layout inteiro a cada pixel de movimento. O grafo acompanha a divisória
-em tempo real; é esse feedback que faz o ajuste parecer correto enquanto se arrasta.
+rodar mais de uma vez por quadro. O grafo acompanha a divisória em tempo real; é esse
+feedback que faz o ajuste parecer correto enquanto se arrasta.
 
-O mesmo recálculo é disparado pelo ajuste via teclado e pelo duplo clique.
+**O que é recalculado — e o que não é.** O arraste chama apenas `ajustarZoom`, não
+`redesenhar`. Mudar a largura da coluna não muda o layout do grafo: `Layout.calcular`
+depende só do estado do repositório, nunca do tamanho da tela. Só a escala precisa ser
+refeita.
+
+Rodar `redesenhar` a 60fps reconstruiria o SVG inteiro e repintaria os painéis de
+Equipe e Histórico a cada quadro — caro à toa, e destruiria o editor inline de nome de
+dev se ele estivesse aberto durante o arraste.
+
+Para isso `main.js` guarda as dimensões devolvidas pelo último `Graph.desenhar`
+(`{ largura, altura }`) numa variável de módulo e expõe um callback leve, `reajustar`,
+que só reaplica `ajustarZoom` sobre elas. É esse callback que o arraste, o teclado e o
+duplo clique disparam.
 
 ### 5. Teclado e acessibilidade
 
@@ -186,8 +198,9 @@ Ficar em `ui.js` também evita criar um arquivo novo, o que obrigaria a mexer na
 | `index.html` | Dois `<div class="divisoria">` dentro de `.colunas` |
 | `styles.css` | `.colunas` para 5 colunas com variáveis; regras `.divisoria`; bordas migradas |
 | `ui.js` | `montarDivisorias` + `clampLargura` exportadas |
-| `main.js` | Chamada em `iniciar()` |
-| `testes.js` | Testes de `clampLargura` |
+| `main.js` | `reajustar` + chamada em `iniciar()` |
+| `testes.js` | `require("./ui.js")` + testes de `clampLargura` |
+| `testes.html` | `<script src="ui.js">` |
 | `branches-na-pratica.html` | Regerado (artefato derivado) |
 
 ## Testes
@@ -201,7 +214,7 @@ Ficar em `ui.js` também evita criar um arquivo novo, o que obrigaria a mexer na
 - Acima de 30% da janela desce para 30%.
 - **Tela estreita** (janela 800px → teto 240px; janela 700px → teto 210px, abaixo do
   piso): o piso vence, resultado é 220.
-- Entrada não-numérica ou `NaN` cai no padrão em vez de escrever `NaN` no CSS.
+- Entrada não-numérica ou `NaN` cai no mínimo (220) em vez de escrever `NaN` no CSS.
 
 ### Navegador (Playwright)
 
