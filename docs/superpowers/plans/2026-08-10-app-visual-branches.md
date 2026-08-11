@@ -6,13 +6,21 @@
 
 **Architecture:** Fluxo de dados unidirecional — ação do usuário → `repo.js` (funções puras que devolvem estado novo) → `storage.js` salva → `layout.js` (puro) converte estado em coordenadas → `graph.js` desenha o SVG e `ui.js` pinta os painéis. Toda a lógica difícil (ancestralidade, fast-forward, órfãos, empilhamento de etiquetas) vive nos dois módulos puros, que não tocam no DOM e por isso são testáveis de verdade.
 
-**Tech Stack:** HTML + CSS + JavaScript puro (ES5-compatível, scripts clássicos). SVG desenhado à mão. Sem build, sem dependências, sem CDN, sem framework de teste. Node v24 apenas como executor de testes durante o desenvolvimento — **não** é requisito para usar o app.
+**Tech Stack:** HTML + CSS + JavaScript puro, em scripts clássicos. SVG desenhado à mão. Sem build, sem dependências, sem CDN, sem framework de teste. Node v24 apenas como executor de testes durante o desenvolvimento — **não** é requisito para usar o app.
 
 ## Global Constraints
 
 Estas regras valem para **todas** as tarefas.
 
 - **Sem build, sem dependências, sem CDN.** Nenhum `npm install`, nenhum `package.json` de runtime, nenhuma tag `<script src="https://...">`. O app abre com duplo clique no `index.html`.
+- **Sintaxe ES5, métodos nativos modernos permitidos.** Como não há transpilação, a
+  **sintaxe** fica em ES5: use `var` (nunca `let`/`const`), `function` (nunca arrow),
+  concatenação de strings (nunca template literal), sem desestruturação e sem
+  `class`. Isso mantém os arquivos uniformes e legíveis para alunos que vão abrir o
+  código. **Métodos nativos** modernos são permitidos e usados de propósito —
+  `String.prototype.padStart`, `String.prototype.normalize`, `Math.imul` — porque
+  existem em todo navegador desde 2017 e no Node 24. Isto **não** é uma contradição
+  com o item acima: a restrição é de sintaxe, não de biblioteca padrão.
 - **Scripts clássicos, nunca módulos ES.** Nada de `import`/`export`/`type="module"`. Módulos ES são bloqueados por CORS em `file://` e quebrariam o duplo clique. Cada módulo usa o padrão de global abaixo, que funciona no navegador **e** via `require()` no Node:
   ```js
   (function (raiz) {
