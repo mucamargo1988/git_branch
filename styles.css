@@ -8,11 +8,16 @@
 :root {
   --texto: #e2e8f0;
   --texto-suave: #94a3b8;
+  --texto-apagado: #64748b;
   --borda: #334155;
   --fundo: #0f172a;
   --fundo-painel: #1e293b;
   --fundo-campo: #0b1220;
-  --destaque: #3b82f6;
+  /* Azul claro, não médio: no tema escuro o botão primário leva texto ESCURO em
+     cima, igual às pílulas das branches. Texto branco sobre um azul médio daria
+     3,7:1 — abaixo do mínimo legível, e são os cinco botões que o professor mais
+     usa. Claro + texto escuro dá ~6,7:1 e ainda unifica a linguagem visual. */
+  --destaque: #60a5fa;
   --erro: #f87171;
   --realce: #fde68a;
   --realce-fundo: #422006;
@@ -97,7 +102,7 @@ input[type="text"], select {
   background: var(--fundo-campo);
   margin-bottom: 6px;
 }
-input[type="text"]::placeholder { color: #64748b; }
+input[type="text"]::placeholder { color: var(--texto-apagado); }
 input[type="text"]:focus, select:focus {
   outline: 2px solid var(--destaque);
   outline-offset: 1px;
@@ -120,8 +125,8 @@ input[type="text"]:focus, select:focus {
   width: 100%;
   padding: 9px 12px;
   font: inherit;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 700;
+  color: #0f172a;
   background: var(--destaque);
   border: none;
   border-radius: 6px;
@@ -205,7 +210,9 @@ input[type="text"]:focus, select:focus {
 #dica-vazio { color: var(--texto-suave); font-size: 19px; padding: 50px 10px; }
 
 .faixa-fundo { fill: transparent; }
-.faixa-fundo.ativa { fill: #172554; }
+/* Precisa sobreviver ao "black crush" de projetor barato, que comprime os tons
+   escuros todos para perto do preto. #172554 sumia; este tem folga suficiente. */
+.faixa-fundo.ativa { fill: #1e3a6b; }
 .faixa-nome { font-size: 14px; font-weight: 700; fill: var(--texto-suave); }
 
 .aresta { fill: none; stroke-width: 4; transition: d 300ms ease, stroke 300ms ease; }
