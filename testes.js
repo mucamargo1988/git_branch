@@ -587,12 +587,12 @@ teste("clampLargura desce qualquer valor acima de 30% da janela", function () {
   igual(UI.clampLargura(1e9, 1000), 300, "arrastar para o infinito trava no teto");
 });
 
-teste("clampLargura: em tela estreita o piso vence o teto", function () {
-  // 30% de 700 é 210, abaixo do piso de 220. Os limites se cruzam e o piso
-  // ganha — a barra trava em 220 e deixa de ser redimensionável, que é
-  // exatamente o comportamento de hoje.
-  igual(UI.clampLargura(400, 700), 220);
-  igual(UI.clampLargura(100, 700), 220);
+teste("clampLargura: em tela estreita o piso cede junto com o teto", function () {
+  // 30% de 700 é 210, abaixo dos 220 nominais. O piso acompanha em vez de travar,
+  // senão as duas barras somariam 440 e sufocariam o miolo.
+  igual(UI.clampLargura(400, 700), 210, "trava no teto de 30%");
+  igual(UI.clampLargura(100, 700), 210, "o piso cedeu para 210");
+  igual(UI.clampLargura(150, 600), 180, "30% de 600");
 });
 
 teste("clampLargura nunca devolve NaN", function () {
@@ -600,13 +600,16 @@ teste("clampLargura nunca devolve NaN", function () {
   igual(UI.clampLargura(undefined, 1920), 220);
   igual(UI.clampLargura(Infinity, 1920), 220);
   igual(UI.clampLargura("300", 1920), 220, "string não conta como número");
+  igual(UI.clampLargura(300, NaN), 220, "janela invalida nao propaga NaN");
+  igual(UI.clampLargura(300, undefined), 220, "janela ausente nao propaga NaN");
 });
 
-teste("clampLargura garante o miolo maior que qualquer barra", function () {
-  // A propriedade que a feature inteira existe para preservar. Se as duas
-  // barras estão no máximo permitido, o que sobra para o miolo (descontadas
-  // as duas divisórias de 8px) ainda precisa ser maior que cada uma delas.
-  [1000, 1280, 1366, 1920, 2560, 3840].forEach(function (janela) {
+teste("clampLargura garante o miolo maior que qualquer barra, em toda largura", function () {
+  // A propriedade que a feature inteira existe para preservar. A lista cruza os
+  // DOIS regimes: acima de ~733px manda o teto de 30%; abaixo, o piso cede e as
+  // barras encolhem junto. Sem as janelas estreitas aqui, o teste passaria mesmo
+  // com o piso inteiramente quebrado.
+  [400, 500, 600, 700, 733, 800, 1000, 1280, 1366, 1920, 2560, 3840].forEach(function (janela) {
     var esq = UI.clampLargura(1e9, janela);
     var dir = UI.clampLargura(1e9, janela);
     var miolo = janela - esq - dir - 16;

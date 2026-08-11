@@ -5,18 +5,24 @@
   // montar() já é o único lugar que recebe o callback vindo de main.js.
   var acaoAoExecutar = null;
 
-  // Cada barra lateral se limita SOZINHA a [220px, 30% da janela]. Como as duas
-  // juntas nunca passam de 60%, o miolo nunca cai abaixo de ~40% e é sempre a
-  // maior coluna — aritmética, sem precisar comparar uma barra com a outra.
+  // Cada barra lateral se limita SOZINHA a 30% da janela, com um piso de 220px que
+  // CEDE quando a janela é muito estreita. Como as duas juntas nunca passam de 60%,
+  // o miolo é sempre a maior coluna em qualquer janela acima de ~160px — aritmética,
+  // sem precisar comparar uma barra com a outra.
   var LARGURA_MINIMA = 220;   // abaixo disto o campo de nome + emoji do painel Ações quebra
   var FRACAO_MAXIMA = 0.30;
 
   function clampLargura(desejada, larguraJanela) {
-    if (typeof desejada !== "number" || !isFinite(desejada)) return LARGURA_MINIMA;
-    // O piso é aplicado por ÚLTIMO de propósito: abaixo de ~733px de janela o
-    // teto de 30% fica menor que o piso e os dois se cruzam. Nessa ordem o piso
-    // vence e a barra apenas trava, em vez de encolher até sumir.
-    return Math.max(LARGURA_MINIMA, Math.min(desejada, larguraJanela * FRACAO_MAXIMA));
+    // Sem uma janela válida não há teto a calcular.
+    if (typeof larguraJanela !== "number" || !isFinite(larguraJanela)) return LARGURA_MINIMA;
+    var teto = larguraJanela * FRACAO_MAXIMA;
+    // O piso CEDE quando a janela é estreita demais para bancá-lo. Travar as duas
+    // barras em 220px numa janela de 600px deixaria o miolo com 144px — menor que
+    // elas, quebrando a única promessa da feature. Cedendo junto, as duas ficam em
+    // 30% e o miolo continua com ~40%.
+    var piso = Math.min(LARGURA_MINIMA, teto);
+    if (typeof desejada !== "number" || !isFinite(desejada)) return piso;
+    return Math.max(piso, Math.min(desejada, teto));
   }
 
   function pegar(id) { return document.getElementById(id); }
