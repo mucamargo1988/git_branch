@@ -66,6 +66,32 @@
     estado.historico.push({ n: estado.historico.length + 1, comando: comando });
   }
 
+  function commit(estado, mensagem) {
+    mensagem = (mensagem || "").trim();
+    if (!mensagem) {
+      return { ok: false, erro: "Escreva uma mensagem para o commit." };
+    }
+
+    var e = clonar(estado);
+    var br = branchAtual(e);
+    var id = gerarId(e.proximoId);
+
+    e.commits.push({
+      id: id,
+      mensagem: mensagem,
+      pais: br.pontaId ? [br.pontaId] : [],
+      autorId: br.donoId,
+      faixa: br.faixa,
+      ordem: e.proximoId - 1
+    });
+    e.proximoId = e.proximoId + 1;
+    br.pontaId = id;
+
+    var comando = 'git commit -m "' + mensagem + '"';
+    registrar(e, comando);
+    return { ok: true, estado: e, comando: comando };
+  }
+
   raiz.Repo = {
     CORES: CORES,
     gerarId: gerarId,
@@ -73,6 +99,7 @@
     clonar: clonar,
     acharBranch: acharBranch,
     acharCommit: acharCommit,
-    branchAtual: branchAtual
+    branchAtual: branchAtual,
+    commit: commit
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
