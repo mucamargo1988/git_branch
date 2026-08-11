@@ -92,6 +92,96 @@
     return { ok: true, estado: e, comando: comando };
   }
 
+  // Muta o estado recebido de propósito: só é chamada de dentro de criarBranch,
+  // que já trabalha sobre um clone.
+  function registrarDev(estado, dono) {
+    var nome = ((dono && dono.nome) || "").trim() || "Dev";
+    var emoji = ((dono && dono.emoji) || "").trim() || "🧑‍💻";
+
+    // Tira os acentos ANTES de gerar o id. Sem isto, "José" e "Josué" viram os dois
+    // "jos", o segundo aluno é confundido com o primeiro e o projetor mostra o nome
+    // errado no meio da aula. `normalize` é método de String — não quebra a pureza
+    // do módulo nem depende de DOM.
+    var semAcento = nome.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    var base = semAcento.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "dev";
+
+    var id = base;
+    var sufixo = 2;
+    while (true) {
+      var achado = null;
+      for (var i = 0; i < estado.devs.length; i++) {
+        if (estado.devs[i].id === id) achado = estado.devs[i];
+      }
+      if (!achado) break;
+      // Mesmo id E mesmo nome: é a mesma pessoa, reaproveita.
+      if (achado.nome === nome) {
+        achado.emoji = emoji;
+        return id;
+      }
+      // Mesmo id, nome diferente: pessoa diferente, precisa de id próprio.
+      id = base + "-" + sufixo;
+      sufixo = sufixo + 1;
+    }
+
+    estado.devs.push({ id: id, nome: nome, emoji: emoji });
+    return id;
+  }
+
+  function criarBranch(estado, nome, dono, jaMudar) {
+    nome = (nome || "").trim();
+    if (!nome) {
+      return { ok: false, erro: "Dê um nome para a branch." };
+    }
+    if (/\s/.test(nome)) {
+      return { ok: false, erro: "Nome de branch não pode ter espaço. Use traço ou barra: feature/login" };
+    }
+    if (acharBranch(estado, nome)) {
+      return { ok: false, erro: "Já existe uma branch chamada " + nome + "." };
+    }
+    if (!branchAtual(estado).pontaId) {
+      return { ok: false, erro: "Faça pelo menos um commit antes de criar uma branch." };
+    }
+
+    var e = clonar(estado);
+    var atual = branchAtual(e);
+    var donoId = registrarDev(e, dono);
+
+    e.branches.push({
+      nome: nome,
+      pontaId: atual.pontaId,
+      cor: CORES[e.proximaFaixa % CORES.length],
+      donoId: donoId,
+      faixa: e.proximaFaixa
+    });
+    e.proximaFaixa = e.proximaFaixa + 1;
+
+    var comando;
+    if (jaMudar) {
+      e.HEAD.branch = nome;
+      comando = "git checkout -b " + nome;
+    } else {
+      comando = "git branch " + nome;
+    }
+
+    registrar(e, comando);
+    return { ok: true, estado: e, comando: comando };
+  }
+
+  function checkout(estado, nome) {
+    if (!acharBranch(estado, nome)) {
+      return { ok: false, erro: "A branch " + nome + " não existe." };
+    }
+    if (estado.HEAD.branch === nome) {
+      return { ok: false, erro: "Você já está em " + nome + "." };
+    }
+
+    var e = clonar(estado);
+    e.HEAD.branch = nome;
+    var comando = "git checkout " + nome;
+    registrar(e, comando);
+    return { ok: true, estado: e, comando: comando };
+  }
+
   raiz.Repo = {
     CORES: CORES,
     gerarId: gerarId,
@@ -100,6 +190,9 @@
     acharBranch: acharBranch,
     acharCommit: acharCommit,
     branchAtual: branchAtual,
-    commit: commit
+    commit: commit,
+    registrarDev: registrarDev,
+    criarBranch: criarBranch,
+    checkout: checkout
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);

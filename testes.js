@@ -102,6 +102,99 @@ teste("commit usa o dono da branch atual como autor", function () {
   igual(r.estado.commits[0].autorId, "voce");
 });
 
+// ---------- repo.js: branch e checkout ----------
+
+function comUmCommit() {
+  return Repo.commit(Repo.estadoInicial(), "inicial").estado;
+}
+
+teste("criarBranch aponta para o commit atual e ganha faixa nova", function () {
+  var e = comUmCommit();
+  var r = Repo.criarBranch(e, "feature/login", { nome: "Ana", emoji: "👩" }, false);
+  verdade(r.ok, r.erro);
+  var nova = Repo.acharBranch(r.estado, "feature/login");
+  igual(nova.pontaId, e.commits[0].id, "nasce no commit onde estávamos");
+  igual(nova.faixa, 1, "master é 0, a nova é 1");
+  igual(r.estado.proximaFaixa, 2);
+  verdade(nova.cor !== Repo.acharBranch(r.estado, "master").cor, "cores devem diferir");
+});
+
+teste("git branch sem checkout: não move HEAD, não cria commit, duas etiquetas no mesmo commit", function () {
+  var e = comUmCommit();
+  var r = Repo.criarBranch(e, "feature/login", { nome: "Ana", emoji: "👩" }, false);
+  igual(r.estado.HEAD.branch, "master", "HEAD não pode ter se movido");
+  igual(r.estado.commits.length, 1, "criar branch não cria commit");
+  igual(r.comando, "git branch feature/login");
+  igual(
+    Repo.acharBranch(r.estado, "master").pontaId,
+    Repo.acharBranch(r.estado, "feature/login").pontaId,
+    "as duas branches apontam para o MESMO commit"
+  );
+});
+
+teste("checkout -b cria e já muda de branch", function () {
+  var r = Repo.criarBranch(comUmCommit(), "feature/x", { nome: "Bruno", emoji: "👨" }, true);
+  igual(r.estado.HEAD.branch, "feature/x");
+  igual(r.comando, "git checkout -b feature/x");
+});
+
+teste("criarBranch registra o dono na equipe", function () {
+  var r = Repo.criarBranch(comUmCommit(), "feature/x", { nome: "Ana", emoji: "👩" }, false);
+  igual(r.estado.devs.length, 2, "o dono padrão mais a Ana");
+  igual(Repo.acharBranch(r.estado, "feature/x").donoId, "ana");
+  igual(r.estado.devs[1], { id: "ana", nome: "Ana", emoji: "👩" });
+});
+
+teste("dono já existente é reaproveitado, não duplicado", function () {
+  var r1 = Repo.criarBranch(comUmCommit(), "a", { nome: "Ana", emoji: "👩" }, false);
+  var r2 = Repo.criarBranch(r1.estado, "b", { nome: "Ana", emoji: "👩" }, false);
+  igual(r2.estado.devs.length, 2, "Ana não pode aparecer duas vezes");
+});
+
+teste("nomes acentuados diferentes não viram a mesma pessoa", function () {
+  var r1 = Repo.criarBranch(comUmCommit(), "a", { nome: "José", emoji: "👨" }, false);
+  var r2 = Repo.criarBranch(r1.estado, "b", { nome: "Josué", emoji: "🧔" }, false);
+  igual(r2.estado.devs.length, 3, "o dono padrão, o José e o Josué");
+  var idA = Repo.acharBranch(r2.estado, "a").donoId;
+  var idB = Repo.acharBranch(r2.estado, "b").donoId;
+  verdade(idA !== idB, "José e Josué não podem compartilhar id");
+
+  var nomes = {};
+  r2.estado.devs.forEach(function (d) { nomes[d.id] = d.nome; });
+  igual(nomes[idA], "José");
+  igual(nomes[idB], "Josué", "o projetor mostraria o nome errado do aluno");
+});
+
+teste("nome de branch repetido é rejeitado", function () {
+  var r1 = Repo.criarBranch(comUmCommit(), "x", { nome: "Ana", emoji: "👩" }, false);
+  var r2 = Repo.criarBranch(r1.estado, "x", { nome: "Bruno", emoji: "👨" }, false);
+  igual(r2.ok, false);
+});
+
+teste("nome de branch vazio ou com espaço é rejeitado", function () {
+  igual(Repo.criarBranch(comUmCommit(), "  ", { nome: "Ana", emoji: "👩" }, false).ok, false);
+  igual(Repo.criarBranch(comUmCommit(), "meu login", { nome: "Ana", emoji: "👩" }, false).ok, false);
+});
+
+teste("não dá para criar branch em repositório sem commits", function () {
+  var r = Repo.criarBranch(Repo.estadoInicial(), "x", { nome: "Ana", emoji: "👩" }, false);
+  igual(r.ok, false);
+});
+
+teste("checkout move o HEAD e registra o comando", function () {
+  var r1 = Repo.criarBranch(comUmCommit(), "x", { nome: "Ana", emoji: "👩" }, false);
+  var r2 = Repo.checkout(r1.estado, "x");
+  verdade(r2.ok, r2.erro);
+  igual(r2.estado.HEAD.branch, "x");
+  igual(r2.comando, "git checkout x");
+});
+
+teste("checkout para branch inexistente ou para a branch atual é rejeitado", function () {
+  var e = comUmCommit();
+  igual(Repo.checkout(e, "nao-existe").ok, false);
+  igual(Repo.checkout(e, "master").ok, false);
+});
+
 // ---------- executor no Node ----------
 
 if (typeof window === "undefined") {
