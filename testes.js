@@ -678,6 +678,16 @@ teste("branch recem-criada desce para a propria faixa em vez de deixa-la vazia",
   igual(etMaster.y, acharNo(l, etMaster.commitId).y, "master fica colada no commit");
 });
 
+teste("apagar uma branch não faz os commits abandonados mudarem de faixa", function () {
+  var e = tresCommits();
+  e = Repo.reset(e, e.commits[0].id).estado;                                     // c2 e c3 viram órfãos
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, false).estado; // faixa 1, empurra a fantasma para baixo
+  var antes = Layout.calcular(e);
+  var depois = Layout.calcular(Repo.excluirBranch(e, "feature", false).estado);
+  igual(acharNo(depois, e.commits[2].id).y, acharNo(antes, e.commits[2].id).y,
+    "o commit abandonado não pode subir de linha só porque uma branch sumiu");
+});
+
 // ---------- ui.js: largura das barras laterais ----------
 
 teste("clampLargura deixa passar um valor no meio da faixa", function () {

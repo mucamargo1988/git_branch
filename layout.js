@@ -28,7 +28,12 @@
     for (var b = 0; b < estado.branches.length; b++) {
       if (estado.branches[b].faixa > maiorFaixa) maiorFaixa = estado.branches[b].faixa;
     }
-    var faixaFantasma = maiorFaixa + 1;
+    // proximaFaixa, e não maiorFaixa + 1: apagar uma branch DIMINUI maiorFaixa, e
+    // a faixa fantasma subiria um degrau levando junto os commits abandonados que
+    // já estavam na tela — a reorganização de desenho que a spec proíbe. proximaFaixa
+    // só cresce. O max cobre um estado montado à mão em que ela tenha ficado para
+    // trás, garantindo que a fantasma nunca caia em cima de uma faixa viva.
+    var faixaFantasma = Math.max(estado.proximaFaixa || 0, maiorFaixa + 1);
 
     var corDaFaixa = {};
     var emojiDoDev = {};
