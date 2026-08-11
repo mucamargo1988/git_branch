@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Branches na prática</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topo">
+  <div class="topo-titulo">meu-projeto</div>
+  <div class="topo-head" id="barra-head"></div>
+  <div class="topo-acoes">
+    <button id="btn-desfazer" class="botao-secundario" disabled>↶ Desfazer</button>
+    <button id="btn-reiniciar" class="botao-secundario">Reiniciar</button>
+  </div>
+</header>
+
+<main class="colunas">
+
+  <aside class="coluna-esquerda">
+    <section class="bloco">
+      <h2>Equipe</h2>
+      <div id="painel-equipe"></div>
+      <p class="nota">No GitHub, a branch principal costuma se chamar <code>main</code>.</p>
+    </section>
+
+    <section class="bloco">
+      <h2>Ações</h2>
+
+      <div class="acao">
+        <label for="msg-commit">Mensagem do commit</label>
+        <input id="msg-commit" type="text" placeholder="ex: cria o cabeçalho">
+        <button id="btn-commit" class="botao">+ Commit</button>
+        <p class="erro" id="erro-commit"></p>
+      </div>
+
+      <div class="acao">
+        <label for="nome-branch">Nova branch</label>
+        <input id="nome-branch" type="text" placeholder="ex: feature/login">
+        <div class="dupla">
+          <input id="nome-dono" type="text" placeholder="Quem trabalha nela">
+          <input id="emoji-dono" type="text" placeholder="👩" maxlength="4">
+        </div>
+        <label class="checkbox"><input id="ja-mudar" type="checkbox" checked> Já mudar pra ela</label>
+        <button id="btn-branch" class="botao">+ Branch</button>
+        <p class="erro" id="erro-branch"></p>
+      </div>
+
+      <div class="acao">
+        <label for="sel-checkout">Mudar de branch</label>
+        <select id="sel-checkout"></select>
+        <button id="btn-checkout" class="botao">Checkout</button>
+        <p class="erro" id="erro-checkout"></p>
+      </div>
+
+      <div class="acao">
+        <label for="sel-merge">Mesclar na branch atual</label>
+        <select id="sel-merge"></select>
+        <button id="btn-merge" class="botao">Merge</button>
+        <p class="erro" id="erro-merge"></p>
+      </div>
+
+      <div class="acao">
+        <label for="sel-reset">Voltar para o commit</label>
+        <select id="sel-reset"></select>
+        <button id="btn-reset" class="botao">Reset</button>
+        <p class="erro" id="erro-reset"></p>
+      </div>
+    </section>
+  </aside>
+
+  <section class="coluna-centro">
+    <div id="avisos"></div>
+    <div class="area-grafo">
+      <p id="dica-vazio">Repositório vazio — clique em <strong>+ Commit</strong> para começar.</p>
+      <svg id="grafo" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </section>
+
+  <aside class="coluna-direita">
+    <h2>Histórico</h2>
+    <ol id="lista-historico"></ol>
+  </aside>
+
+</main>
+
+<script src="repo.js"></script>
+<script src="layout.js"></script>
+<script src="graph.js"></script>
+<script src="storage.js"></script>
+<script src="ui.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

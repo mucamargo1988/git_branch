@@ -6,13 +6,21 @@
 
 **Architecture:** Fluxo de dados unidirecional — ação do usuário → `repo.js` (funções puras que devolvem estado novo) → `storage.js` salva → `layout.js` (puro) converte estado em coordenadas → `graph.js` desenha o SVG e `ui.js` pinta os painéis. Toda a lógica difícil (ancestralidade, fast-forward, órfãos, empilhamento de etiquetas) vive nos dois módulos puros, que não tocam no DOM e por isso são testáveis de verdade.
 
-**Tech Stack:** HTML + CSS + JavaScript puro (ES5-compatível, scripts clássicos). SVG desenhado à mão. Sem build, sem dependências, sem CDN, sem framework de teste. Node v24 apenas como executor de testes durante o desenvolvimento — **não** é requisito para usar o app.
+**Tech Stack:** HTML + CSS + JavaScript puro, em scripts clássicos. SVG desenhado à mão. Sem build, sem dependências, sem CDN, sem framework de teste. Node v24 apenas como executor de testes durante o desenvolvimento — **não** é requisito para usar o app.
 
 ## Global Constraints
 
 Estas regras valem para **todas** as tarefas.
 
 - **Sem build, sem dependências, sem CDN.** Nenhum `npm install`, nenhum `package.json` de runtime, nenhuma tag `<script src="https://...">`. O app abre com duplo clique no `index.html`.
+- **Sintaxe ES5, métodos nativos modernos permitidos.** Como não há transpilação, a
+  **sintaxe** fica em ES5: use `var` (nunca `let`/`const`), `function` (nunca arrow),
+  concatenação de strings (nunca template literal), sem desestruturação e sem
+  `class`. Isso mantém os arquivos uniformes e legíveis para alunos que vão abrir o
+  código. **Métodos nativos** modernos são permitidos e usados de propósito —
+  `String.prototype.padStart`, `String.prototype.normalize`, `Math.imul` — porque
+  existem em todo navegador desde 2017 e no Node 24. Isto **não** é uma contradição
+  com o item acima: a restrição é de sintaxe, não de biblioteca padrão.
 - **Scripts clássicos, nunca módulos ES.** Nada de `import`/`export`/`type="module"`. Módulos ES são bloqueados por CORS em `file://` e quebrariam o duplo clique. Cada módulo usa o padrão de global abaixo, que funciona no navegador **e** via `require()` no Node:
   ```js
   (function (raiz) {
@@ -28,7 +36,15 @@ Estas regras valem para **todas** as tarefas.
 - **Nenhum `alert()`, `confirm()` ou `prompt()` do navegador**, com uma única exceção: o `confirm()` do botão Reiniciar (Task 10).
 - **A branch inicial se chama `master`** (pedido explícito do professor), com a nota de interface sobre `main` prevista na Task 9.
 - **Sem conflitos de merge.** Merge sempre dá certo. Commits não têm arquivos nem conteúdo.
-- **Toda mensagem visível ao usuário em português**, sem jargão desnecessário, exceto os textos que o Git real produz e que o aluno vai reconhecer: `Fast-forward` e `Already up to date.`
+- **Toda mensagem visível ao usuário em português**, sem jargão desnecessário, exceto os
+  textos que o Git real produz e que o aluno vai reconhecer, que ficam em inglês de
+  propósito. São exatamente três:
+  1. `Fast-forward`
+  2. `Already up to date.`
+  3. a mensagem do commit de merge: `Merge branch '<origem>' into <destino>`
+
+  O aluno vai ver essas mesmas palavras no terminal de verdade; traduzi-las tornaria o
+  app menos útil, não mais.
 
 ---
 
@@ -237,17 +253,19 @@ Criar `repo.js`:
 (function (raiz) {
   "use strict";
 
-  // Cores por faixa. Índice 0 = master. Escolhidas para contraste alto em projetor
-  // e para permanecerem distinguíveis entre si mesmo com matiz distorcida.
+  // Cores por faixa. Índice 0 = master. Calibradas para o TEMA ESCURO: tons claros
+  // e saturados, que rendem em projetor e continuam distinguíveis entre si mesmo
+  // com a matiz distorcida pela lente. Tons médios (#2563eb e afins) sumiriam
+  // contra o fundo #0f172a.
   var CORES = [
-    "#2563eb", // azul
-    "#e11d48", // rosa
-    "#16a34a", // verde
-    "#d97706", // âmbar
-    "#7c3aed", // roxo
-    "#0891b2", // ciano
-    "#b45309", // marrom
-    "#4d7c0f"  // oliva
+    "#60a5fa", // azul
+    "#fb7185", // rosa
+    "#4ade80", // verde
+    "#fbbf24", // âmbar
+    "#c084fc", // roxo
+    "#22d3ee", // ciano
+    "#fb923c", // laranja
+    "#a3e635"  // lima
   ];
 
   // SHA falso: hash FNV-1a do contador. Parece um sha de verdade e é determinístico,
@@ -296,6 +314,10 @@ Criar `repo.js`:
     return acharBranch(estado, estado.HEAD.branch);
   }
 
+  // Muta o estado recebido de propósito: só é chamada de dentro das operações
+  // (commit, criarBranch, checkout, merge, reset), que já trabalham sobre um clone.
+  // Por isso fica privada ao módulo — publicá-la seria expor uma pré-condição
+  // perigosa como API.
   function registrar(estado, comando) {
     estado.historico.push({ n: estado.historico.length + 1, comando: comando });
   }
@@ -307,8 +329,7 @@ Criar `repo.js`:
     clonar: clonar,
     acharBranch: acharBranch,
     acharCommit: acharCommit,
-    branchAtual: branchAtual,
-    registrar: registrar
+    branchAtual: branchAtual
   };
 })(typeof globalThis !== "undefined" ? globalThis : this);
 ```
@@ -584,7 +605,7 @@ Em `repo.js`, antes do bloco `raiz.Repo`:
     // "jos", o segundo aluno é confundido com o primeiro e o projetor mostra o nome
     // errado no meio da aula. `normalize` é método de String — não quebra a pureza
     // do módulo nem depende de DOM.
-    var semAcento = nome.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    var semAcento = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     var base = semAcento.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "dev";
 
     var id = base;
@@ -1239,7 +1260,7 @@ Criar `layout.js`:
   var DESLOC_ETIQUETA_X = 34;  // etiqueta fica à direita do commit-ponta
   var ALTURA_ETIQUETA = 30;    // passo do empilhamento
   var ESPACO_ETIQUETAS = 240;  // folga à direita para caber as etiquetas
-  var COR_FANTASMA = "#9ca3af";
+  var COR_FANTASMA = "#64748b"; // cinza-ardósia: visível no escuro, claramente apagado
 
   function calcular(estado) {
     var orfaos = {};
@@ -1426,13 +1447,16 @@ Criar `testes.html`:
   <meta charset="utf-8">
   <title>Testes — App de Branches</title>
   <style>
-    body { font: 16px/1.6 system-ui, sans-serif; margin: 40px auto; max-width: 760px; color: #111827; }
+    body {
+      font: 16px/1.6 system-ui, sans-serif; margin: 40px auto; max-width: 760px;
+      color: #e2e8f0; background: #0f172a;
+    }
     h1 { font-size: 22px; }
     #resumo { font-size: 20px; font-weight: 700; padding: 12px 16px; border-radius: 8px; margin: 20px 0; }
-    .tudo-ok { background: #dcfce7; color: #166534; }
-    .tem-falha { background: #fee2e2; color: #991b1b; }
+    .tudo-ok { background: #14532d; color: #86efac; }
+    .tem-falha { background: #7f1d1d; color: #fca5a5; }
     li { list-style: none; padding: 4px 0; }
-    pre { background: #f3f4f6; padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+    pre { background: #1e293b; padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -1607,17 +1631,28 @@ EOF
 - [ ] **Step 2: Crie `styles.css`**
 
 ```css
-/* Fundo claro de propósito: sala de aula com luz acesa. Tipografia grande para
-   leitura no fundo da sala. */
+/* Tema escuro. Projetor em sala com a luz baixa: fundo escuro cansa menos a vista
+   e faz as cores das branches saltarem. Tipografia grande para leitura no fundo
+   da sala.
+
+   O fundo NÃO é preto puro: projetor com preto absoluto revela poeira e pontos
+   quentes da lente. Um azul-ardósia bem escuro rende melhor. */
 
 :root {
-  --texto: #111827;
-  --texto-suave: #6b7280;
-  --borda: #e5e7eb;
-  --fundo: #ffffff;
-  --fundo-painel: #f9fafb;
-  --destaque: #2563eb;
-  --erro: #b91c1c;
+  --texto: #e2e8f0;
+  --texto-suave: #94a3b8;
+  --borda: #334155;
+  --fundo: #0f172a;
+  --fundo-painel: #1e293b;
+  --fundo-campo: #0b1220;
+  /* Azul claro, não médio: no tema escuro o botão primário leva texto ESCURO em
+     cima, igual às pílulas das branches. Texto branco sobre um azul médio daria
+     3,7:1 — abaixo do mínimo legível, e são os cinco botões que o professor mais
+     usa. Claro + texto escuro dá ~6,7:1 e ainda unifica a linguagem visual. */
+  --destaque: #60a5fa;
+  --erro: #f87171;
+  --realce: #fde68a;
+  --realce-fundo: #422006;
 }
 
 * { box-sizing: border-box; }
@@ -1693,10 +1728,16 @@ input[type="text"], select {
   padding: 8px 10px;
   font: inherit;
   font-size: 15px;
+  color: var(--texto);
   border: 1px solid var(--borda);
   border-radius: 6px;
-  background: #fff;
+  background: var(--fundo-campo);
   margin-bottom: 6px;
+}
+input[type="text"]::placeholder { color: #64748b; }
+input[type="text"]:focus, select:focus {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
 }
 
 .dupla { display: grid; grid-template-columns: 1fr 68px; gap: 6px; }
@@ -1716,26 +1757,28 @@ input[type="text"], select {
   width: 100%;
   padding: 9px 12px;
   font: inherit;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 700;
+  color: #0f172a;
   background: var(--destaque);
   border: none;
   border-radius: 6px;
   cursor: pointer;
 }
-.botao:hover { filter: brightness(1.1); }
-.botao:disabled { background: #cbd5e1; cursor: not-allowed; }
+.botao:hover { filter: brightness(1.15); }
+.botao:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
 
 .botao-secundario {
   padding: 7px 14px;
   font: inherit;
   font-size: 15px;
-  background: #fff;
+  color: var(--texto);
+  background: var(--fundo-campo);
   border: 1px solid var(--borda);
   border-radius: 6px;
   cursor: pointer;
 }
-.botao-secundario:disabled { color: #cbd5e1; cursor: not-allowed; }
+.botao-secundario:hover:not(:disabled) { border-color: var(--destaque); }
+.botao-secundario:disabled { color: #475569; cursor: not-allowed; }
 
 .erro {
   color: var(--erro);
@@ -1745,7 +1788,7 @@ input[type="text"], select {
 }
 
 .nota { font-size: 13px; color: var(--texto-suave); margin-top: 14px; }
-.nota code { background: #e5e7eb; padding: 1px 5px; border-radius: 4px; }
+.nota code { background: var(--fundo-campo); color: var(--texto); padding: 1px 5px; border-radius: 4px; }
 
 /* ---------- equipe ---------- */
 
@@ -1758,7 +1801,7 @@ input[type="text"], select {
   border-left: 5px solid transparent;
   margin-bottom: 4px;
 }
-.dev.ativo { background: #eff6ff; font-weight: 600; }
+.dev.ativo { background: #1d3a6b; font-weight: 600; }
 .dev-emoji { font-size: 24px; line-height: 1; }
 .dev-nome { font-size: 15px; }
 .dev-branch { font-size: 13px; color: var(--texto-suave); }
@@ -1770,10 +1813,14 @@ input[type="text"], select {
 #lista-historico code {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-size: 13.5px;
-  color: #111827;
+  color: var(--texto);
   word-break: break-word;
 }
-#lista-historico li.recente code { background: #fef9c3; font-weight: 700; }
+#lista-historico li.recente code {
+  background: var(--realce-fundo);
+  color: var(--realce);
+  font-weight: 700;
+}
 
 /* ---------- avisos ---------- */
 
@@ -1783,7 +1830,8 @@ input[type="text"], select {
   padding: 9px 14px;
   border-radius: 6px;
   font-size: 15px;
-  background: #fef9c3;
+  color: var(--realce);
+  background: var(--realce-fundo);
   border-left: 5px solid #ca8a04;
 }
 
@@ -1794,25 +1842,31 @@ input[type="text"], select {
 #dica-vazio { color: var(--texto-suave); font-size: 19px; padding: 50px 10px; }
 
 .faixa-fundo { fill: transparent; }
-.faixa-fundo.ativa { fill: #eff6ff; }
-.faixa-nome { font-size: 14px; font-weight: 700; fill: #6b7280; }
+/* Precisa sobreviver ao "black crush" de projetor barato, que comprime os tons
+   escuros todos para perto do preto. #172554 sumia; este tem folga suficiente. */
+.faixa-fundo.ativa { fill: #1e3a6b; }
+.faixa-nome { font-size: 14px; font-weight: 700; fill: var(--texto-suave); }
 
 .aresta { fill: none; stroke-width: 4; transition: d 300ms ease, stroke 300ms ease; }
 .aresta.fantasma { stroke-dasharray: 7 6; }
 
 .no { transition: transform 300ms ease; }
-.no-circulo { stroke: #fff; stroke-width: 3; }
+/* O anel em volta do commit é da cor do FUNDO, não branco: ele existe para abrir
+   um respiro entre a bolinha e a linha que passa atrás dela. */
+.no-circulo { stroke: var(--fundo); stroke-width: 3; }
 .no.fantasma .no-circulo { stroke-dasharray: 5 4; opacity: 0.55; }
 .no-emoji { font-size: 19px; text-anchor: middle; dominant-baseline: central; }
-.no-msg { font-size: 13px; fill: #4b5563; text-anchor: middle; }
-.no.fantasma .no-msg { fill: #9ca3af; }
+.no-msg { font-size: 13px; fill: var(--texto-suave); text-anchor: middle; }
+.no.fantasma .no-msg { fill: #64748b; }
 
 .etiqueta { transition: transform 300ms ease; }
 .etiqueta-fundo { rx: 6; ry: 6; }
-.etiqueta-texto { font-size: 15px; font-weight: 700; fill: #fff; dominant-baseline: central; }
+/* Texto ESCURO sobre a pílula clara. As cores de branch no tema escuro são
+   claras e saturadas; texto branco em cima delas teria contraste baixo. */
+.etiqueta-texto { font-size: 15px; font-weight: 700; fill: #0f172a; dominant-baseline: central; }
 .etiqueta-linha { stroke-width: 2; }
 .marca-head {
-  font-size: 13px; font-weight: 800; fill: #111827; dominant-baseline: central;
+  font-size: 13px; font-weight: 800; fill: var(--texto); dominant-baseline: central;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2009,14 +2063,32 @@ input[type="text"], select {
     return 0;
   }
 
+  // Devolve as dimensões REAIS desenhadas — que não são as do layout quando há
+  // etiquetas acima de y=0. Task 10 usa este retorno, não layout.altura.
   function desenhar(layout) {
+    // Uma pilha alta de etiquetas no mesmo commit sobe acima de y=0: com
+    // MARGEM_Y=70 e passo de 30, seis branches no mesmo commit já estouram.
+    // (Cenário real de aula: "cada aluno cria a sua branch a partir daqui".)
+    // Um viewBox fixo em "0 0 …" cortaria as de cima, então o topo acompanha.
+    var minY = 0;
+    for (var i = 0; i < layout.etiquetas.length; i++) {
+      var topo = layout.etiquetas[i].y - 13; // metade da altura da pílula
+      if (topo < minY) minY = topo;
+    }
+    var altura = layout.altura - minY;
+
     svg.setAttribute("width", layout.largura);
-    svg.setAttribute("height", layout.altura);
-    svg.setAttribute("viewBox", "0 0 " + layout.largura + " " + layout.altura);
+    svg.setAttribute("height", altura);
+    svg.setAttribute("viewBox", minY === 0
+      ? "0 0 " + layout.largura + " " + altura
+      : "0 " + minY + " " + layout.largura + " " + altura);
+
     desenharFaixas(layout);
     desenharArestas(layout);
     desenharNos(layout);
     desenharEtiquetas(layout);
+
+    return { largura: layout.largura, altura: altura };
   }
 
   raiz.Graph = { montar: montar, desenhar: desenhar };
@@ -2035,6 +2107,7 @@ Para conferir o desenho agora, crie um arquivo temporário `_conferir.html`:
 <html lang="pt-BR">
 <head><meta charset="utf-8"><title>Conferência</title><link rel="stylesheet" href="styles.css"></head>
 <body>
+  <p id="prova" style="font:16px monospace;padding:10px;background:#f3f4f6"></p>
   <div class="area-grafo"><svg id="grafo"></svg></div>
   <script src="repo.js"></script>
   <script src="layout.js"></script>
@@ -2046,18 +2119,66 @@ Para conferir o desenho agora, crie um arquivo temporário `_conferir.html`:
     e = Repo.checkout(e, "master").estado;
     e = Repo.commit(e, "ajusta header").estado;
     e = Repo.merge(e, "feature/login").estado;
-    Graph.montar(document.getElementById("grafo"));
+
+    var svg = document.getElementById("grafo");
+    Graph.montar(svg);
     Graph.desenhar(Layout.calcular(e));
+
+    // ---- prova de que a etiqueta DESLIZA em vez de teletransportar ----
+    //
+    // Ninguém consegue ver uma transição de 300ms num diff nem numa captura de
+    // tela. Mas a transição CSS dispara se e somente se o MESMO nó do DOM
+    // continuar na tela com um transform diferente. Isso dá para medir.
+    //
+    // Contra a versão que recriava tudo a cada desenho, "mesmoNo" é false,
+    // porque limpar() destacou o nó antigo. É exatamente o defeito que este
+    // teste existe para pegar.
+    var etiquetaAntes = svg.querySelector(".etiqueta");
+    var transformAntes = etiquetaAntes.getAttribute("transform");
+    var noAntes = svg.querySelector(".no");
+
+    var e2 = Repo.commit(e, "mais um commit").estado;
+    Graph.desenhar(Layout.calcular(e2));
+
+    var etiquetaDepois = svg.querySelector(".etiqueta");
+    var noDepois = svg.querySelector(".no");
+
+    var mesmoNoEtiqueta = etiquetaAntes === etiquetaDepois;
+    var transformMudou = transformAntes !== etiquetaDepois.getAttribute("transform");
+    var mesmoNoCommit = noAntes === noDepois;
+
+    document.getElementById("prova").textContent =
+      "etiqueta reaproveitada: " + mesmoNoEtiqueta +
+      " | transform mudou: " + transformMudou +
+      " | commit reaproveitado: " + mesmoNoCommit +
+      "  =>  " + ((mesmoNoEtiqueta && transformMudou && mesmoNoCommit) ? "ANIMA ✅" : "NÃO ANIMA ❌");
   </script>
 </body>
 </html>
 ```
 
+O `_conferir.html` precisa de um `<p id="prova"></p>` logo antes do `<svg>` para
+receber esse resultado.
+
 Abrir `_conferir.html` com duplo clique.
 
 Expected — confira cada item:
+
+**O item obrigatório, antes de qualquer outro.** A linha cinza no topo da página
+precisa terminar em `ANIMA ✅`, com os três valores `true`:
+
+```
+etiqueta reaproveitada: true | transform mudou: true | commit reaproveitado: true  =>  ANIMA ✅
+```
+
+Se sair `ANIMA ❌`, o reaproveitamento por chave em `graph.js` não está funcionando,
+a etiqueta vai teletransportar em vez de deslizar, e o principal recurso didático do
+app não existe. **Pare e conserte antes de seguir** — não marque esta tarefa como
+concluída.
+
+Depois disso, o resto:
 - Faixa `master` no topo em azul, `feature/login` abaixo em rosa
-- **Quatro** círculos (`c0`, `form de login`, `ajusta header` e o commit de merge), cada um com emoji dentro e mensagem embaixo
+- **Cinco** círculos: `c0`, `form de login`, `ajusta header`, o commit de merge, e o `mais um commit` que a prova de animação acrescentou. Cada um com emoji dentro e mensagem embaixo
 - A linha da `feature/login` **desce em curva** a partir de `c0` e **volta em curva** para o commit de merge
 - O commit de merge está na faixa da `master`
 - Duas etiquetas coloridas, cada uma ligada por um tracinho ao seu commit-ponta
@@ -2123,8 +2244,12 @@ porque as três peças não têm valor separadas: `storage` sem `main` não salv
       var bruto = localStorage.getItem(CHAVE);
       if (!bruto) return null;
       var estado = JSON.parse(bruto);
-      // Guarda contra um localStorage de versão antiga ou corrompido.
-      if (!estado || !estado.branches || !estado.HEAD || !estado.historico) return null;
+      // Guarda contra um localStorage de versão antiga ou corrompido. Confere os
+      // quatro campos que a tela lê logo no primeiro desenho — faltando qualquer
+      // um deles, o app quebraria em cima da aula em vez de simplesmente começar
+      // do zero.
+      if (!estado || !estado.branches || !estado.HEAD ||
+          !estado.historico || !estado.devs || !estado.commits) return null;
       return estado;
     } catch (err) {
       return null;
@@ -2257,32 +2382,56 @@ porque as três peças não têm valor separadas: `storage` sem `main` não salv
     pegar("avisos").appendChild(p);
   }
 
+  function acharDev(estado, donoId) {
+    for (var i = 0; i < estado.devs.length; i++) {
+      if (estado.devs[i].id === donoId) return estado.devs[i];
+    }
+    return null;
+  }
+
+  function span(classe, texto) {
+    var el = document.createElement("span");
+    if (classe) el.className = classe;
+    el.textContent = texto;
+    return el;
+  }
+
+  // Nomes de branch e de aluno são TEXTO digitado na hora, então entram por
+  // textContent, nunca por innerHTML. Não é preciosismo de segurança: uma branch
+  // chamada "feature/<algo>" simplesmente SUMIRIA da tela, porque o navegador
+  // leria o "<" como início de marcação. O professor digitaria um nome e ele
+  // desapareceria do projetor.
   function pintarBarra(estado) {
     var br = Repo.branchAtual(estado);
-    var dono = null;
-    for (var i = 0; i < estado.devs.length; i++) {
-      if (estado.devs[i].id === br.donoId) dono = estado.devs[i];
+    var dono = acharDev(estado, br.donoId);
+    var alvo = pegar("barra-head");
+
+    alvo.textContent = "HEAD → ";
+    var forte = document.createElement("strong");
+    forte.textContent = br.nome;
+    alvo.appendChild(forte);
+    if (dono) {
+      alvo.appendChild(document.createTextNode("  " + dono.emoji + " " + dono.nome));
     }
-    pegar("barra-head").innerHTML =
-      "HEAD → <strong>" + br.nome + "</strong> &nbsp; " +
-      (dono ? dono.emoji + " " + dono.nome : "");
   }
 
   function pintarEquipe(estado) {
     var painel = pegar("painel-equipe");
-    painel.innerHTML = "";
+    painel.textContent = "";
     estado.branches.forEach(function (br) {
-      var dono = null;
-      for (var i = 0; i < estado.devs.length; i++) {
-        if (estado.devs[i].id === br.donoId) dono = estado.devs[i];
-      }
+      var dono = acharDev(estado, br.donoId);
+
       var div = document.createElement("div");
       div.className = "dev" + (estado.HEAD.branch === br.nome ? " ativo" : "");
       div.style.borderLeftColor = br.cor;
-      div.innerHTML =
-        '<span class="dev-emoji">' + (dono ? dono.emoji : "🧑‍💻") + "</span>" +
-        '<span><span class="dev-nome">' + (dono ? dono.nome : "Dev") + "</span><br>" +
-        '<span class="dev-branch">' + br.nome + "</span></span>";
+      div.appendChild(span("dev-emoji", dono ? dono.emoji : "🧑‍💻"));
+
+      var bloco = document.createElement("span");
+      bloco.appendChild(span("dev-nome", dono ? dono.nome : "Dev"));
+      bloco.appendChild(document.createElement("br"));
+      bloco.appendChild(span("dev-branch", br.nome));
+      div.appendChild(bloco);
+
       painel.appendChild(div);
     });
   }
@@ -2429,8 +2578,8 @@ Abrir `index.html` com duplo clique e executar exatamente esta sequência:
 | 1 | Estado inicial | Dica "Repositório vazio", histórico com `1 git init`, `+ Branch` desabilitado |
 | 2 | Commit "c0" | Um círculo azul; etiqueta `master` grudada nele com `◀ HEAD`; `+ Branch` habilita |
 | 3 | Nova branch `feature/login`, dono `Ana` 👩, **desmarcando** "já mudar" | Duas etiquetas **empilhadas** no mesmo círculo; `HEAD` continua na `master`; histórico mostra `git branch feature/login` |
-| 4 | Checkout `feature/login` | `◀ HEAD` pula para a etiqueta rosa; barra do topo mostra 👩 Ana; faixa rosa acende |
-| 5 | Commit "form" | Novo círculo na faixa rosa, com curva descendo do `c0`. **A etiqueta `feature/login` precisa DESLIZAR visivelmente** do círculo antigo para o novo, ao longo de ~0,3s. Se ela pular instantaneamente, o reaproveitamento por chave em `Graph` quebrou — pare e conserte, é o principal recurso didático do app |
+| 4 | Checkout `feature/login` | `◀ HEAD` pula para a etiqueta da `feature/login` (a segunda cor da paleta); barra do topo mostra 👩 Ana; a faixa dela acende com o azul de destaque `#1e3a6b` |
+| 5 | Commit "form" | Novo círculo na faixa da `feature/login`, com curva descendo do `c0`. **A etiqueta `feature/login` precisa DESLIZAR visivelmente** do círculo antigo para o novo, ao longo de ~0,3s. Se ela pular instantaneamente, o reaproveitamento por chave em `Graph` quebrou — pare e conserte, é o principal recurso didático do app |
 | 6 | Checkout `master`, commit "header" | Círculo azul na faixa 0; as duas linhas agora divergem visivelmente |
 | 7 | Merge `feature/login` | Aparece o commit de merge com **duas** linhas chegando nele |
 | 8 | `↶ Desfazer` | O commit de merge some; clicando até o fim, o botão desabilita |
@@ -2480,30 +2629,38 @@ EOF
 O spec exige: o SVG se reescala para caber, e ao atingir um tamanho mínimo legível
 para de encolher e passa a rolar na horizontal, acompanhando o commit mais recente.
 
-Em `styles.css`, substituir a regra `#grafo { display: block; }` por:
+Em `styles.css`, a regra do `#grafo` já precisa ser:
 
 ```css
 #grafo { display: block; transform-origin: 0 0; }
 ```
+
+**Confira antes de editar:** o `transform-origin` já pode estar lá — ele foi
+entregue junto da Task 8. Se já estiver, não faça nada neste passo e diga isso no
+relatório. Se não estiver, acrescente. O `transform-origin: 0 0` é obrigatório: sem
+ele o `scale()` do passo seguinte encolhe a partir do centro e o grafo sai da área
+visível.
 
 Em `main.js`, adicionar antes de `function redesenhar()`:
 
 ```js
   var ESCALA_MINIMA = 0.55; // abaixo disso o texto fica ilegível no projetor
 
-  function ajustarZoom(layout) {
+  // Recebe as dimensões que Graph.desenhar REALMENTE usou, não as do layout:
+  // quando há etiquetas acima de y=0, a altura desenhada é maior que layout.altura.
+  function ajustarZoom(dims) {
     var area = document.querySelector(".area-grafo");
     var svg = document.getElementById("grafo");
     var disponivel = area.clientWidth - 40;
 
-    var escala = Math.min(1, disponivel / layout.largura);
+    var escala = Math.min(1, disponivel / dims.largura);
     if (escala < ESCALA_MINIMA) escala = ESCALA_MINIMA;
 
     svg.style.transform = "scale(" + escala + ")";
     // O elemento encolhe visualmente mas não no fluxo: reservamos o espaço real
     // para que a rolagem horizontal funcione quando a escala trava no mínimo.
-    svg.style.marginBottom = (layout.altura * (escala - 1)) + "px";
-    svg.style.marginRight = (layout.largura * (escala - 1)) + "px";
+    svg.style.marginBottom = (dims.altura * (escala - 1)) + "px";
+    svg.style.marginRight = (dims.largura * (escala - 1)) + "px";
 
     // Acompanha o commit mais recente.
     area.scrollLeft = area.scrollWidth;
@@ -2513,9 +2670,7 @@ Em `main.js`, adicionar antes de `function redesenhar()`:
 E, dentro de `redesenhar()`, substituir a linha `Graph.desenhar(Layout.calcular(estado));` por:
 
 ```js
-    var layout = Layout.calcular(estado);
-    Graph.desenhar(layout);
-    ajustarZoom(layout);
+    ajustarZoom(Graph.desenhar(Layout.calcular(estado)));
 ```
 
 Ainda em `main.js`, dentro de `iniciar()`, antes de `redesenhar();`:
@@ -2552,16 +2707,21 @@ var SCRIPTS = ["repo.js", "layout.js", "graph.js", "storage.js", "ui.js", "main.
 var html = fs.readFileSync("index.html", "utf8");
 var css = fs.readFileSync("styles.css", "utf8");
 
+// Atenção: as substituições usam FUNÇÃO como segundo argumento, não string.
+// String.prototype.replace interpreta $&, $1 e $` dentro de uma string de
+// substituição como retrovisor. Nenhum arquivo tem "$" hoje, mas no dia em que
+// alguém escrever uma regex ou um preço no CSS, o arquivo único divergiria em
+// silêncio da versão em pasta — e o guard lá embaixo não pegaria.
 html = html.replace(
   '<link rel="stylesheet" href="styles.css">',
-  "<style>\n" + css + "\n</style>"
+  function () { return "<style>\n" + css + "\n</style>"; }
 );
 
 SCRIPTS.forEach(function (arquivo) {
   var js = fs.readFileSync(arquivo, "utf8");
   html = html.replace(
     '<script src="' + arquivo + '"></script>',
-    "<script>\n" + js + "\n</script>"
+    function () { return "<script>\n" + js + "\n</script>"; }
   );
 });
 

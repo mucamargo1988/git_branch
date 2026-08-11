@@ -1,0 +1,264 @@
+/* Tema escuro. Projetor em sala com a luz baixa: fundo escuro cansa menos a vista
+   e faz as cores das branches saltarem. Tipografia grande para leitura no fundo
+   da sala.
+
+   O fundo NÃO é preto puro: projetor com preto absoluto revela poeira e pontos
+   quentes da lente. Um azul-ardósia bem escuro rende melhor. */
+
+:root {
+  --texto: #e2e8f0;
+  --texto-suave: #94a3b8;
+  --texto-apagado: #64748b;
+  --borda: #334155;
+  --fundo: #0f172a;
+  --fundo-painel: #1e293b;
+  --fundo-campo: #0b1220;
+  /* Azul claro, não médio: no tema escuro o botão primário leva texto ESCURO em
+     cima, igual às pílulas das branches. Texto branco sobre um azul médio daria
+     3,7:1 — abaixo do mínimo legível, e são os cinco botões que o professor mais
+     usa. Claro + texto escuro dá ~6,7:1 e ainda unifica a linguagem visual. */
+  --destaque: #60a5fa;
+  --erro: #f87171;
+  --realce: #fde68a;
+  --realce-fundo: #422006;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 17px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--texto);
+  background: var(--fundo);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------- topo ---------- */
+
+.topo {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  border-bottom: 2px solid var(--borda);
+  background: var(--fundo-painel);
+  flex: 0 0 auto;
+}
+.topo-titulo { font-weight: 700; font-size: 19px; }
+.topo-head { font-size: 19px; flex: 1; }
+.topo-head strong { color: var(--destaque); }
+.topo-acoes { display: flex; gap: 8px; }
+
+/* ---------- colunas ---------- */
+
+.colunas {
+  display: grid;
+  grid-template-columns: 300px 1fr 320px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.coluna-esquerda, .coluna-direita {
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--fundo-painel);
+}
+.coluna-esquerda { border-right: 2px solid var(--borda); }
+.coluna-direita { border-left: 2px solid var(--borda); }
+
+.coluna-centro {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--texto-suave);
+  margin: 0 0 12px;
+}
+
+.bloco { margin-bottom: 28px; }
+
+/* ---------- controles ---------- */
+
+.acao { margin-bottom: 18px; }
+.acao label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+
+input[type="text"], select {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--texto);
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: var(--fundo-campo);
+  margin-bottom: 6px;
+}
+input[type="text"]::placeholder { color: var(--texto-apagado); }
+input[type="text"]:focus, select:focus {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+.dupla { display: grid; grid-template-columns: 1fr 68px; gap: 6px; }
+.dupla input { margin-bottom: 6px; }
+
+.checkbox {
+  font-weight: 400 !important;
+  font-size: 14px !important;
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.checkbox input { width: auto; }
+
+.botao {
+  width: 100%;
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 700;
+  color: #0f172a;
+  background: var(--destaque);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.botao:hover { filter: brightness(1.15); }
+.botao:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+
+.botao-secundario {
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--texto);
+  background: var(--fundo-campo);
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.botao-secundario:hover:not(:disabled) { border-color: var(--destaque); }
+.botao-secundario:disabled { color: #475569; cursor: not-allowed; }
+
+.erro {
+  color: var(--erro);
+  font-size: 13px;
+  margin: 4px 0 0;
+  min-height: 1px;
+}
+
+.nota { font-size: 13px; color: var(--texto-suave); margin-top: 14px; }
+.nota code { background: var(--fundo-campo); color: var(--texto); padding: 1px 5px; border-radius: 4px; }
+
+/* ---------- equipe ---------- */
+
+.dev {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border-left: 5px solid transparent;
+  margin-bottom: 4px;
+}
+.dev.ativo { background: #1d3a6b; font-weight: 600; }
+.dev-emoji { font-size: 24px; line-height: 1; }
+.dev-nome { font-size: 15px; }
+.dev-branch { font-size: 13px; color: var(--texto-suave); }
+
+.dev.editando { cursor: default; flex-wrap: wrap; }
+.dev.editando input[type="text"] {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+  padding: 5px 7px;
+  font-size: 14px;
+}
+.dev.editando input.dev-editar-emoji { flex: 0 0 56px; text-align: center; }
+.dev.editando .dev-editar-salvar {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  background: var(--destaque);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* ---------- histórico ---------- */
+
+#lista-historico { margin: 0; padding-left: 26px; font-size: 14px; }
+#lista-historico li { margin-bottom: 8px; }
+#lista-historico code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 13.5px;
+  color: var(--texto);
+  word-break: break-word;
+}
+#lista-historico li.recente code {
+  background: var(--realce-fundo);
+  color: var(--realce);
+  font-weight: 700;
+}
+
+/* ---------- avisos ---------- */
+
+#avisos { padding: 0 20px; flex: 0 0 auto; }
+.aviso {
+  margin: 10px 0 0;
+  padding: 9px 14px;
+  border-radius: 6px;
+  font-size: 15px;
+  color: var(--realce);
+  background: var(--realce-fundo);
+  border-left: 5px solid #ca8a04;
+}
+
+/* ---------- grafo ---------- */
+
+.area-grafo { flex: 1 1 auto; overflow: auto; position: relative; padding: 10px 20px 20px; }
+#grafo { display: block; transform-origin: 0 0; }
+#dica-vazio { color: var(--texto-suave); font-size: 19px; padding: 50px 10px; }
+
+.faixa-fundo { fill: transparent; }
+/* Precisa sobreviver ao "black crush" de projetor barato, que comprime os tons
+   escuros todos para perto do preto. #172554 sumia; este tem folga suficiente. */
+.faixa-fundo.ativa { fill: #1e3a6b; }
+.faixa-nome { font-size: 14px; font-weight: 700; fill: var(--texto-suave); }
+
+.aresta { fill: none; stroke-width: 4; transition: d 300ms ease, stroke 300ms ease; }
+.aresta.fantasma { stroke-dasharray: 7 6; }
+
+.no { transition: transform 300ms ease; }
+/* O anel em volta do commit é da cor do FUNDO, não branco: ele existe para abrir
+   um respiro entre a bolinha e a linha que passa atrás dela. */
+.no-circulo { stroke: var(--fundo); stroke-width: 3; }
+.no.fantasma .no-circulo { stroke-dasharray: 5 4; opacity: 0.55; }
+.no-emoji { font-size: 19px; text-anchor: middle; dominant-baseline: central; }
+.no-msg { font-size: 13px; fill: var(--texto-suave); text-anchor: middle; }
+.no.fantasma .no-msg { fill: #64748b; }
+
+.etiqueta { transition: transform 300ms ease; }
+.etiqueta-fundo { rx: 6; ry: 6; }
+/* Texto ESCURO sobre a pílula clara. As cores de branch no tema escuro são
+   claras e saturadas; texto branco em cima delas teria contraste baixo. */
+.etiqueta-texto { font-size: 15px; font-weight: 700; fill: #0f172a; dominant-baseline: central; }
+.etiqueta-linha { stroke-width: 2; }
+.marca-head {
+  font-size: 13px; font-weight: 800; fill: var(--texto); dominant-baseline: central;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aresta, .no, .etiqueta { transition: none; }
+}
