@@ -372,7 +372,9 @@ teste("Layout.calcular aceita estado antigo, sem o campo faixasApagadas", functi
 - [ ] **Step 2: Rodar os testes e ver falhar**
 
 Run: `node testes.js`
-Expected: FAIL nos dois primeiros. O primeiro mostra o commit vivo com `#64748b` (`COR_FANTASMA`) em vez da cor da branch, e `faixa` chegando `null`. O terceiro já passa — é uma rede de proteção contra a implementação do Step 3 quebrar estados antigos.
+Expected: FAIL só no primeiro, que mostra o commit vivo com `#64748b` (`COR_FANTASMA`) em vez da cor da branch, e `faixa` chegando `null`.
+
+Os outros dois já passam, de propósito. O segundo afirma a **ausência** de uma faixa, e antes desta task nenhuma faixa apagada é desenhada de todo jeito — nenhum teste desse formato conseguiria ficar vermelho aqui. Ele é guarda de regressão: fica vermelho se alguém tirar a guarda de ocupação do Step 5 ou marcar a ocupação sem o `!orfao` do Step 4. O terceiro protege estados antigos de quebrarem com as edições do Step 3.
 
 - [ ] **Step 3: Ler o rastro em `corDaFaixa`**
 
