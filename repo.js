@@ -102,7 +102,7 @@
     // "jos", o segundo aluno é confundido com o primeiro e o projetor mostra o nome
     // errado no meio da aula. `normalize` é método de String — não quebra a pureza
     // do módulo nem depende de DOM.
-    var semAcento = nome.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    var semAcento = nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     var base = semAcento.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "dev";
 
     var id = base;
