@@ -470,14 +470,88 @@ git commit -m "Torna as barras laterais arrastaveis, com teclado e reset"
 
 ---
 
-## Task 4: Verificação automatizada e arquivo único
+## Task 4: Barra de rolagem discreta
+
+Pedido do usuário durante a execução. Entra antes da regeneração do arquivo único, senão ele teria que ser regerado duas vezes.
+
+**Files:**
+- Modify: `styles.css` (novo bloco no fim, depois de `.divisoria`)
+
+**Interfaces:**
+- Consumes: as variáveis de cor já existentes em `:root` (`--borda`, `--texto-apagado`).
+- Produces: nada de código. Nenhuma outra task depende desta.
+
+**Contexto:** três áreas rolam no app — `.coluna-esquerda`, `.coluna-direita` (ambas `overflow-y: auto`) e `.area-grafo` (`overflow: auto`, e a única que rola nos dois eixos). Hoje as três usam a barra padrão do sistema: larga e clara, e num projetor ela puxa atenção que devia ir para o grafo.
+
+A escolha aqui é ser discreta **sem** desaparecer: uma barra invisível até o hover esconderia do professor que o painel rola. Fina, trilha transparente, polegar na cor da borda — e mais contraste só quando o cursor chega perto.
+
+- [ ] **Step 1: Escrever o bloco de estilo**
+
+No fim de `styles.css`, **antes** do bloco `@media (prefers-reduced-motion: reduce)`:
+
+```css
+/* ---------- barras de rolagem ---------- */
+
+/* Discretas de propósito: num projetor, uma barra larga e clara rouba atenção do
+   grafo, que é o objeto da aula. Fina, sem trilha visível, e com contraste maior
+   só quando o cursor chega perto. Discreta, não invisível — sumir por completo
+   esconderia do professor que o painel rola. */
+.coluna-esquerda, .coluna-direita, .area-grafo {
+  scrollbar-width: thin;
+  scrollbar-color: var(--borda) transparent;
+}
+
+/* As duas de cima só valem em Firefox e Chrome recente. Sem este bloco, Safari e
+   Chrome mais antigo continuariam com a barra cinza-clara do sistema — que é
+   exatamente o que queremos evitar. */
+.coluna-esquerda::-webkit-scrollbar,
+.coluna-direita::-webkit-scrollbar,
+.area-grafo::-webkit-scrollbar { width: 9px; height: 9px; }
+
+.coluna-esquerda::-webkit-scrollbar-track,
+.coluna-direita::-webkit-scrollbar-track,
+.area-grafo::-webkit-scrollbar-track { background: transparent; }
+
+.coluna-esquerda::-webkit-scrollbar-thumb,
+.coluna-direita::-webkit-scrollbar-thumb,
+.area-grafo::-webkit-scrollbar-thumb {
+  background: var(--borda);
+  border-radius: 6px;
+}
+
+.coluna-esquerda::-webkit-scrollbar-thumb:hover,
+.coluna-direita::-webkit-scrollbar-thumb:hover,
+.area-grafo::-webkit-scrollbar-thumb:hover { background: var(--texto-apagado); }
+
+/* O quadradinho onde as barras horizontal e vertical se encontram, só na área do
+   grafo. Sem isto ele fica com o cinza padrão e denuncia a barra que acabamos de
+   discretizar. */
+.area-grafo::-webkit-scrollbar-corner { background: transparent; }
+```
+
+- [ ] **Step 2: Conferir no navegador**
+
+`http://localhost:8321/index.html` (`file://` está bloqueado no navegador controlado). Criar commits suficientes para o grafo estourar a área e as barras aparecerem, e conferir nas três áreas: barra fina, trilha invisível, polegar discreto mas achável, e o canto da área do grafo sem o quadrado cinza.
+
+Confirmar também que `.area-grafo` continua rolando de fato — trilha transparente não pode virar "não rola".
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add styles.css
+git commit -m "Deixa as barras de rolagem discretas"
+```
+
+---
+
+## Task 5: Verificação automatizada e arquivo único
 
 **Files:**
 - Modify: `README.md` (uma linha sobre o ajuste das barras)
 - Regenerate: `branches-na-pratica.html`
 
 **Interfaces:**
-- Consumes: a feature completa das Tasks 1-3.
+- Consumes: a feature completa das Tasks 1-4.
 - Produces: nada de código.
 
 - [ ] **Step 1: Verificar o arraste com Playwright**
@@ -555,5 +629,11 @@ git commit -m "Regenera o arquivo unico e documenta as barras ajustaveis"
 | §6 Reset por duplo clique | Task 3, Step 2 |
 | §7 Código em `ui.js` | Tasks 1 e 3 |
 | Testes de unidade | Task 1, Step 2 |
-| Testes de navegador | Task 4, Step 1 |
-| Regenerar arquivo único | Task 4, Step 3 |
+| Testes de navegador | Task 5, Step 1 |
+| Regenerar arquivo único | Task 5, Step 3 |
+
+Fora da spec original, pedido durante a execução:
+
+| Pedido | Onde |
+|---|---|
+| Barra de rolagem mais discreta | Task 4 |
