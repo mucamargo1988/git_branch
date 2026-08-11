@@ -137,6 +137,15 @@ mesmo código — relevante se a aula for numa lousa digital. Acompanha
 `touch-action: none` na divisória, senão o navegador interpreta o arraste como
 rolagem da página e o gesto nunca chega ao JS.
 
+**Ressalva honesta sobre o toque:** a divisória tem 8px, o que é cerca de 2mm —
+abaixo do mínimo de 24px que a WCAG 2.5.8 pede para alvo de toque. Caneta e mouse
+acertam; dedo, na prática, não. O código aceita os três, mas só dois funcionam
+bem. Manter os 8px é decisão consciente: o professor projeta de um notebook com
+mouse, e alargar a faixa mudaria a geometria que os testes fixam e o desenho que
+as revisões já fecharam. Se um dia o alvo de dedo importar, a saída é alargar a
+trilha (para ~14px) e pintar só o miolo com `linear-gradient`, preservando a
+decisão de que nada se sobrepõe.
+
 **Cursor:** `cursor: col-resize` na divisória em repouso e, durante o arraste, também
 no `<body>`. Sem o segundo, o cursor volta a ser seta assim que o ponteiro passa por
 cima do grafo, no meio do próprio arraste.
