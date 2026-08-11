@@ -519,6 +519,20 @@ teste("dono já existente é reaproveitado, não duplicado", function () {
   igual(r2.estado.devs.length, 2, "Ana não pode aparecer duas vezes");
 });
 
+teste("nomes acentuados diferentes não viram a mesma pessoa", function () {
+  var r1 = Repo.criarBranch(comUmCommit(), "a", { nome: "José", emoji: "👨" }, false);
+  var r2 = Repo.criarBranch(r1.estado, "b", { nome: "Josué", emoji: "🧔" }, false);
+  igual(r2.estado.devs.length, 3, "o dono padrão, o José e o Josué");
+  var idA = Repo.acharBranch(r2.estado, "a").donoId;
+  var idB = Repo.acharBranch(r2.estado, "b").donoId;
+  verdade(idA !== idB, "José e Josué não podem compartilhar id");
+
+  var nomes = {};
+  r2.estado.devs.forEach(function (d) { nomes[d.id] = d.nome; });
+  igual(nomes[idA], "José");
+  igual(nomes[idB], "Josué", "o projetor mostraria o nome errado do aluno");
+});
+
 teste("nome de branch repetido é rejeitado", function () {
   var r1 = Repo.criarBranch(comUmCommit(), "x", { nome: "Ana", emoji: "👩" }, false);
   var r2 = Repo.criarBranch(r1.estado, "x", { nome: "Bruno", emoji: "👨" }, false);
@@ -565,14 +579,32 @@ Em `repo.js`, antes do bloco `raiz.Repo`:
   function registrarDev(estado, dono) {
     var nome = ((dono && dono.nome) || "").trim() || "Dev";
     var emoji = ((dono && dono.emoji) || "").trim() || "🧑‍💻";
-    var id = nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "dev";
 
-    for (var i = 0; i < estado.devs.length; i++) {
-      if (estado.devs[i].id === id) {
-        estado.devs[i].emoji = emoji;
+    // Tira os acentos ANTES de gerar o id. Sem isto, "José" e "Josué" viram os dois
+    // "jos", o segundo aluno é confundido com o primeiro e o projetor mostra o nome
+    // errado no meio da aula. `normalize` é método de String — não quebra a pureza
+    // do módulo nem depende de DOM.
+    var semAcento = nome.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    var base = semAcento.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "dev";
+
+    var id = base;
+    var sufixo = 2;
+    while (true) {
+      var achado = null;
+      for (var i = 0; i < estado.devs.length; i++) {
+        if (estado.devs[i].id === id) achado = estado.devs[i];
+      }
+      if (!achado) break;
+      // Mesmo id E mesmo nome: é a mesma pessoa, reaproveita.
+      if (achado.nome === nome) {
+        achado.emoji = emoji;
         return id;
       }
+      // Mesmo id, nome diferente: pessoa diferente, precisa de id próprio.
+      id = base + "-" + sufixo;
+      sufixo = sufixo + 1;
     }
+
     estado.devs.push({ id: id, nome: nome, emoji: emoji });
     return id;
   }
@@ -638,7 +670,7 @@ Acrescentar `registrarDev: registrarDev, criarBranch: criarBranch, checkout: che
 - [ ] **Step 4: Rode os testes e confirme que passam**
 
 Run: `node testes.js`
-Expected: `22/22 passaram`
+Expected: `23/23 passaram`
 
 - [ ] **Step 5: Commit**
 
@@ -850,7 +882,7 @@ Acrescentar `alcancaveis: alcancaveis, ehAncestral: ehAncestral, merge: merge,` 
 - [ ] **Step 4: Rode os testes e confirme que passam**
 
 Run: `node testes.js`
-Expected: `28/28 passaram`
+Expected: `29/29 passaram`
 
 - [ ] **Step 5: Commit**
 
@@ -1008,7 +1040,7 @@ Acrescentar `reset: reset, orfaos: orfaos, commitsAlcancaveis: commitsAlcancavei
 - [ ] **Step 4: Rode os testes e confirme que passam**
 
 Run: `node testes.js`
-Expected: `35/35 passaram`
+Expected: `36/36 passaram`
 
 - [ ] **Step 5: Commit**
 
@@ -1148,8 +1180,11 @@ teste("a etiqueta é ancorada no commit-ponta, não na faixa da branch", functio
   e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, false).estado;
   var l = Layout.calcular(e);
   var no = acharNo(l, e.commits[0].id);
+  // Limiar de meia faixa: rejeita sem ambiguidade a etiqueta desenhada em
+  // branch.faixa * ESPACO_Y (o bug que este teste existe para pegar) e aceita
+  // o deslocamento normal do empilhamento.
   for (var i = 0; i < l.etiquetas.length; i++) {
-    verdade(Math.abs(l.etiquetas[i].y - no.y) < Layout.ESPACO_Y,
+    verdade(Math.abs(l.etiquetas[i].y - no.y) < Layout.ESPACO_Y / 2,
       "a etiqueta " + l.etiquetas[i].nome + " flutuou para longe do commit");
   }
 });
@@ -1350,7 +1385,7 @@ Criar `layout.js`:
 - [ ] **Step 4: Rode os testes e confirme que passam**
 
 Run: `node testes.js`
-Expected: `45/45 passaram`
+Expected: `46/46 passaram`
 
 - [ ] **Step 5: Commit**
 
@@ -1437,7 +1472,7 @@ Criar `testes.html`:
 Abrir `testes.html` com duplo clique (protocolo `file://`, **não** por servidor local).
 
 Expected:
-- Faixa verde: `45 de 45 passaram`
+- Faixa verde: `46 de 46 passaram`
 - Console do navegador (F12) **sem nenhum erro**. Se aparecer erro de CORS ou de módulo, algum arquivo virou módulo ES — corrija para script clássico antes de seguir.
 
 - [ ] **Step 3: Commit**
@@ -1795,6 +1830,15 @@ input[type="text"], select {
   var svg = null;
   var grupos = {};
 
+  // Elementos reaproveitados entre desenhos, indexados por chave estável:
+  // commits por id, etiquetas por nome de branch.
+  //
+  // Isto NÃO é otimização — é o que faz a animação existir. Transição CSS só
+  // dispara quando um elemento JÁ ESTAVA na tela com outro valor. Se recriássemos
+  // tudo a cada desenho, a etiqueta teletransportaria em vez de deslizar, e o
+  // principal recurso didático do app iria embora.
+  var vistos = { nos: {}, etiquetas: {} };
+
   function criar(tag, atributos) {
     var el = document.createElementNS(NS, tag);
     for (var k in atributos) {
@@ -1812,10 +1856,22 @@ input[type="text"], select {
   function montar(elementoSvg) {
     svg = elementoSvg;
     limpar(svg);
+    vistos = { nos: {}, etiquetas: {} };
     ["faixas", "arestas", "nos", "etiquetas"].forEach(function (nome) {
       grupos[nome] = criar("g", { "class": "grupo-" + nome });
       svg.appendChild(grupos[nome]);
     });
+  }
+
+  // Descarta os elementos cuja chave sumiu do layout (ex.: reiniciar, desfazer).
+  function podar(cache, grupo, presentes) {
+    for (var chave in cache) {
+      if (!Object.prototype.hasOwnProperty.call(cache, chave)) continue;
+      if (!presentes[chave]) {
+        grupo.removeChild(cache[chave].g);
+        delete cache[chave];
+      }
+    }
   }
 
   function desenharFaixas(layout) {
@@ -1853,63 +1909,94 @@ input[type="text"], select {
     });
   }
 
+  // Reaproveita o <g> de cada commit (chave = id) para que a descida até a faixa
+  // fantasma, no reset, seja animada em vez de instantânea.
   function desenharNos(layout) {
-    limpar(grupos.nos);
+    var presentes = {};
+
     layout.nos.forEach(function (n) {
-      var g = criar("g", {
-        "class": "no" + (n.orfao ? " fantasma" : ""),
-        transform: "translate(" + n.x + "," + n.y + ")"
-      });
-      g.appendChild(criar("circle", { "class": "no-circulo", r: Layout.RAIO, fill: n.cor }));
+      presentes[n.id] = true;
+      var item = vistos.nos[n.id];
 
-      var emoji = criar("text", { "class": "no-emoji", x: 0, y: 1 });
-      emoji.textContent = n.emoji;
-      g.appendChild(emoji);
+      if (!item) {
+        item = {
+          g: criar("g", { "class": "no" }),
+          circulo: criar("circle", { "class": "no-circulo", r: Layout.RAIO }),
+          emoji: criar("text", { "class": "no-emoji", x: 0, y: 1 }),
+          msg: criar("text", { "class": "no-msg", x: 0, y: Layout.RAIO + 20 }),
+          titulo: criar("title", {})
+        };
+        item.g.appendChild(item.circulo);
+        item.g.appendChild(item.emoji);
+        item.g.appendChild(item.msg);
+        item.g.appendChild(item.titulo);
+        // Posiciona ANTES de entrar no DOM: assim o commit novo aparece no lugar
+        // certo, e só os movimentos posteriores é que animam.
+        item.g.setAttribute("transform", "translate(" + n.x + "," + n.y + ")");
+        grupos.nos.appendChild(item.g);
+        vistos.nos[n.id] = item;
+      }
 
-      var msg = criar("text", { "class": "no-msg", x: 0, y: Layout.RAIO + 20 });
-      msg.textContent = n.mensagem.length > 16 ? n.mensagem.slice(0, 15) + "…" : n.mensagem;
-      g.appendChild(msg);
-
-      var titulo = criar("title", {});
-      titulo.textContent = n.id + " — " + n.mensagem;
-      g.appendChild(titulo);
-
-      grupos.nos.appendChild(g);
+      item.g.setAttribute("class", "no" + (n.orfao ? " fantasma" : ""));
+      item.g.setAttribute("transform", "translate(" + n.x + "," + n.y + ")");
+      item.circulo.setAttribute("fill", n.cor);
+      item.emoji.textContent = n.emoji;
+      item.msg.textContent = n.mensagem.length > 16 ? n.mensagem.slice(0, 15) + "…" : n.mensagem;
+      item.titulo.textContent = n.id + " — " + n.mensagem;
     });
+
+    podar(vistos.nos, grupos.nos, presentes);
   }
 
+  // A chave é o NOME da branch, não o commit. É exatamente por isso que a etiqueta
+  // desliza: quando um commit novo entra, o mesmo <g> continua na tela e só muda de
+  // transform — que é o momento "a master não copiou nada, ela só andou".
   function desenharEtiquetas(layout) {
-    limpar(grupos.etiquetas);
+    var presentes = {};
+
     layout.etiquetas.forEach(function (e) {
+      presentes[e.nome] = true;
+      var item = vistos.etiquetas[e.nome];
+
+      if (!item) {
+        item = {
+          g: criar("g", { "class": "etiqueta" }),
+          linha: criar("line", { "class": "etiqueta-linha", x2: 0, y2: 0 }),
+          fundo: criar("rect", { "class": "etiqueta-fundo", y: -13, height: 26 }),
+          texto: criar("text", { "class": "etiqueta-texto", x: 11, y: 1 }),
+          head: criar("text", { "class": "marca-head", y: 1 })
+        };
+        item.g.appendChild(item.linha);
+        item.g.appendChild(item.fundo);
+        item.g.appendChild(item.texto);
+        item.g.appendChild(item.head);
+        item.g.setAttribute("transform", "translate(" + e.x + "," + e.y + ")");
+        grupos.etiquetas.appendChild(item.g);
+        vistos.etiquetas[e.nome] = item;
+      }
+
       var rotulo = e.emoji + " " + e.nome;
       var largura = 22 + rotulo.length * 9.5;
 
-      var g = criar("g", { "class": "etiqueta", transform: "translate(" + e.x + "," + e.y + ")" });
+      item.g.setAttribute("transform", "translate(" + e.x + "," + e.y + ")");
 
-      // conector até o commit, para deixar explícito em quem a etiqueta está grudada
-      g.appendChild(criar("line", {
-        "class": "etiqueta-linha",
-        x1: -(e.x - layoutXdoCommit(layout, e.commitId)), y1: (layoutYdoCommit(layout, e.commitId) - e.y),
-        x2: 0, y2: 0, stroke: e.cor
-      }));
+      // Conector até o commit, em coordenadas locais do <g>. Deixa explícito em
+      // qual bolinha a etiqueta está grudada.
+      item.linha.setAttribute("x1", layoutXdoCommit(layout, e.commitId) - e.x);
+      item.linha.setAttribute("y1", layoutYdoCommit(layout, e.commitId) - e.y);
+      item.linha.setAttribute("stroke", e.cor);
 
-      g.appendChild(criar("rect", {
-        "class": "etiqueta-fundo",
-        x: 0, y: -13, width: largura, height: 26, fill: e.cor
-      }));
+      item.fundo.setAttribute("x", 0);
+      item.fundo.setAttribute("width", largura);
+      item.fundo.setAttribute("fill", e.cor);
 
-      var texto = criar("text", { "class": "etiqueta-texto", x: 11, y: 1 });
-      texto.textContent = rotulo;
-      g.appendChild(texto);
+      item.texto.textContent = rotulo;
 
-      if (e.ehHead) {
-        var head = criar("text", { "class": "marca-head", x: largura + 10, y: 1 });
-        head.textContent = "◀ HEAD";
-        g.appendChild(head);
-      }
-
-      grupos.etiquetas.appendChild(g);
+      item.head.setAttribute("x", largura + 10);
+      item.head.textContent = e.ehHead ? "◀ HEAD" : "";
     });
+
+    podar(vistos.etiquetas, grupos.etiquetas, presentes);
   }
 
   function layoutXdoCommit(layout, id) {
@@ -1970,7 +2057,7 @@ Abrir `_conferir.html` com duplo clique.
 
 Expected — confira cada item:
 - Faixa `master` no topo em azul, `feature/login` abaixo em rosa
-- Cinco círculos, cada um com emoji dentro e mensagem embaixo
+- **Quatro** círculos (`c0`, `form de login`, `ajusta header` e o commit de merge), cada um com emoji dentro e mensagem embaixo
 - A linha da `feature/login` **desce em curva** a partir de `c0` e **volta em curva** para o commit de merge
 - O commit de merge está na faixa da `master`
 - Duas etiquetas coloridas, cada uma ligada por um tracinho ao seu commit-ponta
@@ -2237,7 +2324,16 @@ porque as três peças não têm valor separadas: `storage` sem `main` não salv
     pintarEquipe(estado);
     pintarHistorico(estado);
     pintarDropdowns(estado);
+
     pegar("btn-branch").disabled = !Repo.branchAtual(estado).pontaId;
+
+    // Botão segue o select: sem opção para escolher, não há o que executar.
+    // Sem isto, clicar em Merge no início da aula joga no projetor a mensagem
+    // sem sentido "A branch  não existe."
+    ["checkout", "merge", "reset"].forEach(function (n) {
+      pegar("btn-" + n).disabled = pegar("sel-" + n).disabled;
+    });
+
     pegar("dica-vazio").style.display = estado.commits.length === 0 ? "block" : "none";
   }
 
@@ -2334,7 +2430,7 @@ Abrir `index.html` com duplo clique e executar exatamente esta sequência:
 | 2 | Commit "c0" | Um círculo azul; etiqueta `master` grudada nele com `◀ HEAD`; `+ Branch` habilita |
 | 3 | Nova branch `feature/login`, dono `Ana` 👩, **desmarcando** "já mudar" | Duas etiquetas **empilhadas** no mesmo círculo; `HEAD` continua na `master`; histórico mostra `git branch feature/login` |
 | 4 | Checkout `feature/login` | `◀ HEAD` pula para a etiqueta rosa; barra do topo mostra 👩 Ana; faixa rosa acende |
-| 5 | Commit "form" | Novo círculo na faixa rosa, com curva descendo do `c0`; etiqueta rosa desliza |
+| 5 | Commit "form" | Novo círculo na faixa rosa, com curva descendo do `c0`. **A etiqueta `feature/login` precisa DESLIZAR visivelmente** do círculo antigo para o novo, ao longo de ~0,3s. Se ela pular instantaneamente, o reaproveitamento por chave em `Graph` quebrou — pare e conserte, é o principal recurso didático do app |
 | 6 | Checkout `master`, commit "header" | Círculo azul na faixa 0; as duas linhas agora divergem visivelmente |
 | 7 | Merge `feature/login` | Aparece o commit de merge com **duas** linhas chegando nele |
 | 8 | `↶ Desfazer` | O commit de merge some; clicando até o fim, o botão desabilita |
@@ -2351,7 +2447,7 @@ e é esvaziada ao recarregar — testar na ordem inversa daria um falso negativo
 - [ ] **Step 5: Rode os testes de novo para garantir que nada quebrou**
 
 Run: `node testes.js`
-Expected: `45/45 passaram`
+Expected: `46/46 passaram`
 
 - [ ] **Step 6: Commit**
 
@@ -2557,10 +2653,10 @@ Node é usado só para testes e para gerar o arquivo único. O app em si não pr
 - [ ] **Step 6: Verificação final**
 
 Run: `node testes.js`
-Expected: `45/45 passaram`
+Expected: `46/46 passaram`
 
 Abrir `testes.html` no navegador.
-Expected: faixa verde, `45 de 45 passaram`
+Expected: faixa verde, `46 de 46 passaram`
 
 - [ ] **Step 7: Commit**
 
@@ -2580,7 +2676,7 @@ EOF
 
 | Requisito do spec | Onde é implementado |
 |---|---|
-| Branch é ponteiro; etiqueta desliza | Task 2 (`br.pontaId = id`), Task 6 (etiqueta ancorada na ponta), Task 8 (`transition: transform`) |
+| Branch é ponteiro; etiqueta desliza | Task 2 (`br.pontaId = id`), Task 6 (etiqueta ancorada na ponta), Task 8 (**reaproveitamento de elementos por chave** em `Graph`, sem o qual a transição CSS não dispara e a etiqueta teletransporta) |
 | `HEAD` é marcador próprio | Task 6 (`ehHead`), Task 8 (`◀ HEAD`) |
 | Pessoas por branch | Task 3 (`registrarDev`), Task 6 (`emoji` no nó e na etiqueta), Task 9 (painel EQUIPE) |
 | Dois tipos de merge | Task 4 (`tipo`), Task 8 (curva de reencontro) |
