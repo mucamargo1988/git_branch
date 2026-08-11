@@ -2028,14 +2028,32 @@ input[type="text"], select {
     return 0;
   }
 
+  // Devolve as dimensões REAIS desenhadas — que não são as do layout quando há
+  // etiquetas acima de y=0. Task 10 usa este retorno, não layout.altura.
   function desenhar(layout) {
+    // Uma pilha alta de etiquetas no mesmo commit sobe acima de y=0: com
+    // MARGEM_Y=70 e passo de 30, seis branches no mesmo commit já estouram.
+    // (Cenário real de aula: "cada aluno cria a sua branch a partir daqui".)
+    // Um viewBox fixo em "0 0 …" cortaria as de cima, então o topo acompanha.
+    var minY = 0;
+    for (var i = 0; i < layout.etiquetas.length; i++) {
+      var topo = layout.etiquetas[i].y - 13; // metade da altura da pílula
+      if (topo < minY) minY = topo;
+    }
+    var altura = layout.altura - minY;
+
     svg.setAttribute("width", layout.largura);
-    svg.setAttribute("height", layout.altura);
-    svg.setAttribute("viewBox", "0 0 " + layout.largura + " " + layout.altura);
+    svg.setAttribute("height", altura);
+    svg.setAttribute("viewBox", minY === 0
+      ? "0 0 " + layout.largura + " " + altura
+      : "0 " + minY + " " + layout.largura + " " + altura);
+
     desenharFaixas(layout);
     desenharArestas(layout);
     desenharNos(layout);
     desenharEtiquetas(layout);
+
+    return { largura: layout.largura, altura: altura };
   }
 
   raiz.Graph = { montar: montar, desenhar: desenhar };
@@ -2054,6 +2072,7 @@ Para conferir o desenho agora, crie um arquivo temporário `_conferir.html`:
 <html lang="pt-BR">
 <head><meta charset="utf-8"><title>Conferência</title><link rel="stylesheet" href="styles.css"></head>
 <body>
+  <p id="prova" style="font:16px monospace;padding:10px;background:#f3f4f6"></p>
   <div class="area-grafo"><svg id="grafo"></svg></div>
   <script src="repo.js"></script>
   <script src="layout.js"></script>
@@ -2065,18 +2084,66 @@ Para conferir o desenho agora, crie um arquivo temporário `_conferir.html`:
     e = Repo.checkout(e, "master").estado;
     e = Repo.commit(e, "ajusta header").estado;
     e = Repo.merge(e, "feature/login").estado;
-    Graph.montar(document.getElementById("grafo"));
+
+    var svg = document.getElementById("grafo");
+    Graph.montar(svg);
     Graph.desenhar(Layout.calcular(e));
+
+    // ---- prova de que a etiqueta DESLIZA em vez de teletransportar ----
+    //
+    // Ninguém consegue ver uma transição de 300ms num diff nem numa captura de
+    // tela. Mas a transição CSS dispara se e somente se o MESMO nó do DOM
+    // continuar na tela com um transform diferente. Isso dá para medir.
+    //
+    // Contra a versão que recriava tudo a cada desenho, "mesmoNo" é false,
+    // porque limpar() destacou o nó antigo. É exatamente o defeito que este
+    // teste existe para pegar.
+    var etiquetaAntes = svg.querySelector(".etiqueta");
+    var transformAntes = etiquetaAntes.getAttribute("transform");
+    var noAntes = svg.querySelector(".no");
+
+    var e2 = Repo.commit(e, "mais um commit").estado;
+    Graph.desenhar(Layout.calcular(e2));
+
+    var etiquetaDepois = svg.querySelector(".etiqueta");
+    var noDepois = svg.querySelector(".no");
+
+    var mesmoNoEtiqueta = etiquetaAntes === etiquetaDepois;
+    var transformMudou = transformAntes !== etiquetaDepois.getAttribute("transform");
+    var mesmoNoCommit = noAntes === noDepois;
+
+    document.getElementById("prova").textContent =
+      "etiqueta reaproveitada: " + mesmoNoEtiqueta +
+      " | transform mudou: " + transformMudou +
+      " | commit reaproveitado: " + mesmoNoCommit +
+      "  =>  " + ((mesmoNoEtiqueta && transformMudou && mesmoNoCommit) ? "ANIMA ✅" : "NÃO ANIMA ❌");
   </script>
 </body>
 </html>
 ```
 
+O `_conferir.html` precisa de um `<p id="prova"></p>` logo antes do `<svg>` para
+receber esse resultado.
+
 Abrir `_conferir.html` com duplo clique.
 
 Expected — confira cada item:
+
+**O item obrigatório, antes de qualquer outro.** A linha cinza no topo da página
+precisa terminar em `ANIMA ✅`, com os três valores `true`:
+
+```
+etiqueta reaproveitada: true | transform mudou: true | commit reaproveitado: true  =>  ANIMA ✅
+```
+
+Se sair `ANIMA ❌`, o reaproveitamento por chave em `graph.js` não está funcionando,
+a etiqueta vai teletransportar em vez de deslizar, e o principal recurso didático do
+app não existe. **Pare e conserte antes de seguir** — não marque esta tarefa como
+concluída.
+
+Depois disso, o resto:
 - Faixa `master` no topo em azul, `feature/login` abaixo em rosa
-- **Quatro** círculos (`c0`, `form de login`, `ajusta header` e o commit de merge), cada um com emoji dentro e mensagem embaixo
+- **Cinco** círculos: `c0`, `form de login`, `ajusta header`, o commit de merge, e o `mais um commit` que a prova de animação acrescentou. Cada um com emoji dentro e mensagem embaixo
 - A linha da `feature/login` **desce em curva** a partir de `c0` e **volta em curva** para o commit de merge
 - O commit de merge está na faixa da `master`
 - Duas etiquetas coloridas, cada uma ligada por um tracinho ao seu commit-ponta
@@ -2510,19 +2577,21 @@ Em `main.js`, adicionar antes de `function redesenhar()`:
 ```js
   var ESCALA_MINIMA = 0.55; // abaixo disso o texto fica ilegível no projetor
 
-  function ajustarZoom(layout) {
+  // Recebe as dimensões que Graph.desenhar REALMENTE usou, não as do layout:
+  // quando há etiquetas acima de y=0, a altura desenhada é maior que layout.altura.
+  function ajustarZoom(dims) {
     var area = document.querySelector(".area-grafo");
     var svg = document.getElementById("grafo");
     var disponivel = area.clientWidth - 40;
 
-    var escala = Math.min(1, disponivel / layout.largura);
+    var escala = Math.min(1, disponivel / dims.largura);
     if (escala < ESCALA_MINIMA) escala = ESCALA_MINIMA;
 
     svg.style.transform = "scale(" + escala + ")";
     // O elemento encolhe visualmente mas não no fluxo: reservamos o espaço real
     // para que a rolagem horizontal funcione quando a escala trava no mínimo.
-    svg.style.marginBottom = (layout.altura * (escala - 1)) + "px";
-    svg.style.marginRight = (layout.largura * (escala - 1)) + "px";
+    svg.style.marginBottom = (dims.altura * (escala - 1)) + "px";
+    svg.style.marginRight = (dims.largura * (escala - 1)) + "px";
 
     // Acompanha o commit mais recente.
     area.scrollLeft = area.scrollWidth;
@@ -2532,9 +2601,7 @@ Em `main.js`, adicionar antes de `function redesenhar()`:
 E, dentro de `redesenhar()`, substituir a linha `Graph.desenhar(Layout.calcular(estado));` por:
 
 ```js
-    var layout = Layout.calcular(estado);
-    Graph.desenhar(layout);
-    ajustarZoom(layout);
+    ajustarZoom(Graph.desenhar(Layout.calcular(estado)));
 ```
 
 Ainda em `main.js`, dentro de `iniciar()`, antes de `redesenhar();`:
@@ -2571,16 +2638,21 @@ var SCRIPTS = ["repo.js", "layout.js", "graph.js", "storage.js", "ui.js", "main.
 var html = fs.readFileSync("index.html", "utf8");
 var css = fs.readFileSync("styles.css", "utf8");
 
+// Atenção: as substituições usam FUNÇÃO como segundo argumento, não string.
+// String.prototype.replace interpreta $&, $1 e $` dentro de uma string de
+// substituição como retrovisor. Nenhum arquivo tem "$" hoje, mas no dia em que
+// alguém escrever uma regex ou um preço no CSS, o arquivo único divergiria em
+// silêncio da versão em pasta — e o guard lá embaixo não pegaria.
 html = html.replace(
   '<link rel="stylesheet" href="styles.css">',
-  "<style>\n" + css + "\n</style>"
+  function () { return "<style>\n" + css + "\n</style>"; }
 );
 
 SCRIPTS.forEach(function (arquivo) {
   var js = fs.readFileSync(arquivo, "utf8");
   html = html.replace(
     '<script src="' + arquivo + '"></script>',
-    "<script>\n" + js + "\n</script>"
+    function () { return "<script>\n" + js + "\n</script>"; }
   );
 });
 
