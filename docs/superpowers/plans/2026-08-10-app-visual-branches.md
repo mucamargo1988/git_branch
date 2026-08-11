@@ -1645,7 +1645,11 @@ EOF
   --fundo: #0f172a;
   --fundo-painel: #1e293b;
   --fundo-campo: #0b1220;
-  --destaque: #3b82f6;
+  /* Azul claro, não médio: no tema escuro o botão primário leva texto ESCURO em
+     cima, igual às pílulas das branches. Texto branco sobre um azul médio daria
+     3,7:1 — abaixo do mínimo legível, e são os cinco botões que o professor mais
+     usa. Claro + texto escuro dá ~6,7:1 e ainda unifica a linguagem visual. */
+  --destaque: #60a5fa;
   --erro: #f87171;
   --realce: #fde68a;
   --realce-fundo: #422006;
@@ -1753,8 +1757,8 @@ input[type="text"]:focus, select:focus {
   width: 100%;
   padding: 9px 12px;
   font: inherit;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 700;
+  color: #0f172a;
   background: var(--destaque);
   border: none;
   border-radius: 6px;
@@ -1838,7 +1842,9 @@ input[type="text"]:focus, select:focus {
 #dica-vazio { color: var(--texto-suave); font-size: 19px; padding: 50px 10px; }
 
 .faixa-fundo { fill: transparent; }
-.faixa-fundo.ativa { fill: #172554; }
+/* Precisa sobreviver ao "black crush" de projetor barato, que comprime os tons
+   escuros todos para perto do preto. #172554 sumia; este tem folga suficiente. */
+.faixa-fundo.ativa { fill: #1e3a6b; }
 .faixa-nome { font-size: 14px; font-weight: 700; fill: var(--texto-suave); }
 
 .aresta { fill: none; stroke-width: 4; transition: d 300ms ease, stroke 300ms ease; }
@@ -2595,11 +2601,17 @@ EOF
 O spec exige: o SVG se reescala para caber, e ao atingir um tamanho mínimo legível
 para de encolher e passa a rolar na horizontal, acompanhando o commit mais recente.
 
-Em `styles.css`, substituir a regra `#grafo { display: block; }` por:
+Em `styles.css`, a regra do `#grafo` já precisa ser:
 
 ```css
 #grafo { display: block; transform-origin: 0 0; }
 ```
+
+**Confira antes de editar:** o `transform-origin` já pode estar lá — ele foi
+entregue junto da Task 8. Se já estiver, não faça nada neste passo e diga isso no
+relatório. Se não estiver, acrescente. O `transform-origin: 0 0` é obrigatório: sem
+ele o `scale()` do passo seguinte encolhe a partir do centro e o grafo sai da área
+visível.
 
 Em `main.js`, adicionar antes de `function redesenhar()`:
 
