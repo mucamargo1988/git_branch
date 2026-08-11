@@ -19,8 +19,12 @@
       var bruto = localStorage.getItem(CHAVE);
       if (!bruto) return null;
       var estado = JSON.parse(bruto);
-      // Guarda contra um localStorage de versão antiga ou corrompido.
-      if (!estado || !estado.branches || !estado.HEAD || !estado.historico) return null;
+      // Guarda contra um localStorage de versão antiga ou corrompido. Confere os
+      // quatro campos que a tela lê logo no primeiro desenho — faltando qualquer
+      // um deles, o app quebraria em cima da aula em vez de simplesmente começar
+      // do zero.
+      if (!estado || !estado.branches || !estado.HEAD ||
+          !estado.historico || !estado.devs || !estado.commits) return null;
       return estado;
     } catch (err) {
       return null;

@@ -25,6 +25,20 @@
     }
   }
 
+  function acharDev(estado, donoId) {
+    for (var i = 0; i < estado.devs.length; i++) {
+      if (estado.devs[i].id === donoId) return estado.devs[i];
+    }
+    return null;
+  }
+
+  function span(classe, texto) {
+    var el = document.createElement("span");
+    if (classe) el.className = classe;
+    el.textContent = texto;
+    return el;
+  }
+
   function montar(aoExecutar) {
     pegar("btn-commit").addEventListener("click", function () {
       aoExecutar("commit", { mensagem: pegar("msg-commit").value });
@@ -93,30 +107,35 @@
 
   function pintarBarra(estado) {
     var br = Repo.branchAtual(estado);
-    var dono = null;
-    for (var i = 0; i < estado.devs.length; i++) {
-      if (estado.devs[i].id === br.donoId) dono = estado.devs[i];
+    var dono = acharDev(estado, br.donoId);
+    var alvo = pegar("barra-head");
+
+    alvo.textContent = "HEAD → ";
+    var forte = document.createElement("strong");
+    forte.textContent = br.nome;
+    alvo.appendChild(forte);
+    if (dono) {
+      alvo.appendChild(document.createTextNode("  " + dono.emoji + " " + dono.nome));
     }
-    pegar("barra-head").innerHTML =
-      "HEAD → <strong>" + br.nome + "</strong> &nbsp; " +
-      (dono ? dono.emoji + " " + dono.nome : "");
   }
 
   function pintarEquipe(estado) {
     var painel = pegar("painel-equipe");
-    painel.innerHTML = "";
+    painel.textContent = "";
     estado.branches.forEach(function (br) {
-      var dono = null;
-      for (var i = 0; i < estado.devs.length; i++) {
-        if (estado.devs[i].id === br.donoId) dono = estado.devs[i];
-      }
+      var dono = acharDev(estado, br.donoId);
+
       var div = document.createElement("div");
       div.className = "dev" + (estado.HEAD.branch === br.nome ? " ativo" : "");
       div.style.borderLeftColor = br.cor;
-      div.innerHTML =
-        '<span class="dev-emoji">' + (dono ? dono.emoji : "🧑‍💻") + "</span>" +
-        '<span><span class="dev-nome">' + (dono ? dono.nome : "Dev") + "</span><br>" +
-        '<span class="dev-branch">' + br.nome + "</span></span>";
+      div.appendChild(span("dev-emoji", dono ? dono.emoji : "🧑‍💻"));
+
+      var bloco = document.createElement("span");
+      bloco.appendChild(span("dev-nome", dono ? dono.nome : "Dev"));
+      bloco.appendChild(document.createElement("br"));
+      bloco.appendChild(span("dev-branch", br.nome));
+      div.appendChild(bloco);
+
       painel.appendChild(div);
     });
   }
