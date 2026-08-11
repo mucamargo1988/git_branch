@@ -407,6 +407,24 @@ function cenarioMesclado() {
   return { estado: Repo.merge(c.estado, "feature").estado, c1: c.c1, c2: c.c2 };
 }
 
+// Diferente de cenarioDivergente/cenarioMesclado, aqui existe uma TERCEIRA
+// referência para o mesmo commit: review nasce da feature (mesma ponta, c2) e
+// nunca recebe checkout. Isso separa duas ideias que nos cenários de duas
+// branches sempre coincidem: "não mesclada na branch atual" (o motivo da
+// recusa do -d) e "inalcançável por qualquer branch" (o motivo real de
+// orfaos()). Com -D, feature some mas review continua alcançando c2 — nada
+// fica abandonado.
+function cenarioTerceiraReferencia() {
+  var e = Repo.commit(Repo.estadoInicial(), "c1").estado;
+  var c1 = e.commits[0].id;
+  e = Repo.criarBranch(e, "feature", { nome: "Ana", emoji: "👩" }, true).estado;
+  e = Repo.commit(e, "c2").estado;
+  var c2 = e.commits[1].id;
+  e = Repo.criarBranch(e, "review", { nome: "Bia", emoji: "👧" }, false).estado;
+  e = Repo.checkout(e, "master").estado;
+  return { estado: e, c1: c1, c2: c2 };
+}
+
 teste("estado inicial: nenhuma faixa apagada", function () {
   igual(Repo.estadoInicial().faixasApagadas, []);
 });
@@ -489,6 +507,15 @@ teste("excluirBranch aceita estado antigo, sem o campo faixasApagadas", function
   var r = Repo.excluirBranch(m.estado, "feature", false);
   verdade(r.ok, r.erro);
   igual(r.estado.faixasApagadas.length, 1, "o campo nasce na hora, sem quebrar");
+});
+
+teste("com três referências ao mesmo commit, -d recusa e -D não abandona nada", function () {
+  var c = cenarioTerceiraReferencia();
+  igual(Repo.excluirBranch(c.estado, "feature", false).ok, false,
+    "feature não está mesclada na master, que é a branch atual");
+  var r = Repo.excluirBranch(c.estado, "feature", true);
+  verdade(r.ok, r.erro);
+  igual(Repo.orfaos(r.estado), [], "review ainda alcança c2 — forçar não abandonou nada");
 });
 
 // ---------- layout.js ----------
@@ -721,6 +748,22 @@ teste("Layout.calcular aceita estado antigo, sem o campo faixasApagadas", functi
   var c = cenarioDivergente();
   delete c.estado.faixasApagadas;
   igual(Layout.calcular(c.estado).faixas.length, 2, "as duas branches continuam desenhadas");
+});
+
+teste("com três referências ao mesmo commit, -D deixa c2 vivo e colorido, sob a faixa (apagada)", function () {
+  var c = cenarioTerceiraReferencia();
+  var br = Repo.acharBranch(c.estado, "feature");
+  var l = Layout.calcular(Repo.excluirBranch(c.estado, "feature", true).estado);
+
+  var no = acharNo(l, c.c2);
+  igual(no.orfao, false, "review ainda aponta para c2: ninguém abandonou nada");
+  igual(no.cor, br.cor, "herda a cor da feature, não a da faixa fantasma");
+  verdade(no.cor !== Layout.COR_FANTASMA, "cinza aqui significaria abandonado");
+
+  var faixa = null;
+  for (var i = 0; i < l.faixas.length; i++) if (l.faixas[i].indice === br.faixa) faixa = l.faixas[i];
+  verdade(faixa !== null, "faixa 1 continua desenhada: ainda tem commit vivo");
+  igual(faixa.nome, "feature (apagada)");
 });
 
 // ---------- ui.js: largura das barras laterais ----------

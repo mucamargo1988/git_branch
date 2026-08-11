@@ -25,9 +25,10 @@ Para levar em pendrive ou mandar para os alunos, use `branches-na-pratica.html` 
 
 Todo comando executado aparece numerado no painel da direita.
 
-Não dá para apagar a branch em que você está. Se a branch tiver commits que
-mais ninguém alcança, é preciso marcar `Forçar (-D)` — e aí eles vão para a
-faixa de commits abandonados, em cinza, em vez de sumir da tela.
+Não dá para apagar a branch em que você está. Se a branch não tiver sido
+mesclada na branch atual, é preciso marcar `Forçar (-D)` — e os commits que
+ninguém mais alcança vão para a faixa de commits abandonados, em cinza, em
+vez de sumir da tela.
 
 As duas barras laterais são ajustáveis: arraste a linha que separa cada uma do
 grafo, ou dê Tab até ela e use as setas. Duplo clique volta à largura original.

@@ -211,7 +211,7 @@
       return {
         ok: false,
         erro: "A branch " + nome + " não foi mesclada em " + atual.nome +
-          ". Marque \"Forçar (-D)\" para apagar mesmo assim — os commits dela ficam abandonados."
+          ". Marque \"Forçar (-D)\" para apagar mesmo assim — os commits que só ela alcançava ficam abandonados."
       };
     }
 

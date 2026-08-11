@@ -42,7 +42,8 @@ Git local, apresentada com a estética de um grafo de rede.
 - **Arquivos e conteúdo.** Commits carregam apenas mensagem, autor e pais.
 - **Camada GitHub/nuvem:** sem push, pull, Pull Request, review, remotes.
 - **Roteiro/tutorial pronto.** O professor conduz ao vivo; não há passo a passo guiado.
-- `HEAD` destacado (detached HEAD), rebase, cherry-pick, stash, tags, deletar branch.
+- `HEAD` destacado (detached HEAD), rebase, cherry-pick, stash, tags, deletar branch
+  (revisto depois — ver `2026-08-11-excluir-branch-design.md`, que traz `git branch -d`/`-D`).
 - Banco de dados, backend, autenticação, build step.
 
 ## Arquitetura

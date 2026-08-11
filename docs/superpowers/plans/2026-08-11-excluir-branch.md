@@ -193,7 +193,7 @@ Em `repo.js`, logo **depois** da função `criarBranch` e antes de `checkout`:
       return {
         ok: false,
         erro: "A branch " + nome + " não foi mesclada em " + atual.nome +
-          ". Marque \"Forçar (-D)\" para apagar mesmo assim — os commits dela ficam abandonados."
+          ". Marque \"Forçar (-D)\" para apagar mesmo assim — os commits que só ela alcançava ficam abandonados."
       };
     }
 
@@ -374,7 +374,7 @@ teste("Layout.calcular aceita estado antigo, sem o campo faixasApagadas", functi
 Run: `node testes.js`
 Expected: FAIL só no primeiro, que mostra o commit vivo com `#64748b` (`COR_FANTASMA`) em vez da cor da branch, e `faixa` chegando `null`.
 
-Os outros dois já passam, de propósito. O segundo afirma a **ausência** de uma faixa, e antes desta task nenhuma faixa apagada é desenhada de todo jeito — nenhum teste desse formato conseguiria ficar vermelho aqui. Ele é guarda de regressão: fica vermelho se alguém tirar a guarda de ocupação do Step 5 ou marcar a ocupação sem o `!orfao` do Step 4. O terceiro protege estados antigos de quebrarem com as edições do Step 3.
+Os outros dois já passam, de propósito. O segundo afirma a **ausência** de uma faixa, e antes desta task nenhuma faixa apagada é desenhada de todo jeito — nenhum teste desse formato conseguiria ficar vermelho aqui. Ele é guarda de regressão: fica vermelho se alguém tirar a guarda de ocupação do Step 5. O terceiro protege estados antigos de quebrarem com as edições do Step 3.
 
 - [ ] **Step 3: Ler o rastro em `corDaFaixa`**
 
@@ -670,9 +670,10 @@ Em `README.md`, na tabela de botões, entre a linha do Merge e a do Reset:
 Em `README.md`, logo depois da frase *"Todo comando executado aparece numerado no painel da direita."*, acrescente um parágrafo:
 
 ```markdown
-Não dá para apagar a branch em que você está. Se a branch tiver commits que
-mais ninguém alcança, é preciso marcar `Forçar (-D)` — e aí eles vão para a
-faixa de commits abandonados, em cinza, em vez de sumir da tela.
+Não dá para apagar a branch em que você está. Se a branch não tiver sido
+mesclada na branch atual, é preciso marcar `Forçar (-D)` — e os commits que
+ninguém mais alcança vão para a faixa de commits abandonados, em cinza, em
+vez de sumir da tela.
 ```
 
 Não mexa em mais nada do README: a frase sobre o app não simular conflitos nem ter push/pull continua verdadeira.

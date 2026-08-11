@@ -71,7 +71,7 @@ Bloqueios, nesta ordem:
 |---|---|
 | Branch não existe | `A branch X não existe.` |
 | É a branch atual | `Não dá para apagar a branch em que você está. Faça checkout em outra antes.` |
-| Não mesclada, sem forçar | `A branch X não foi mesclada em <atual>. Marque "Forçar (-D)" para apagar mesmo assim — os commits dela ficam abandonados.` |
+| Não mesclada, sem forçar | `A branch X não foi mesclada em <atual>. Marque "Forçar (-D)" para apagar mesmo assim — os commits que só ela alcançava ficam abandonados.` |
 
 O primeiro é defensivo: o dropdown só oferece branches que existem. Vale a linha
 porque `repo.js` é testado isoladamente e não pode confiar na tela.
