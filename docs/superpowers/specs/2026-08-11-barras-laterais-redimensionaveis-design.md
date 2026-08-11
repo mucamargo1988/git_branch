@@ -73,23 +73,45 @@ paralelas coladas.
 
 Cada barra é limitada individualmente a:
 
-- **mínimo 220px**
-- **máximo 30% da largura da janela**
+- **teto: 30% da largura da janela**
+- **piso: 220px — ou o próprio teto, quando a janela não comporta os 220px**
 
-Se as duas barras juntas nunca passam de 60% da janela, o miolo nunca fica abaixo de
-40% menos os 16px das duas divisórias — e portanto é sempre maior que qualquer uma
-das duas, em qualquer largura de tela acima de 160px. É aritmética, não verificação
-em tempo de execução: cada barra se limita sozinha, sem precisar consultar a outra.
+O teto é o que sustenta a promessa. Se as duas barras juntas nunca passam de 60% da
+janela, o miolo fica com 40% menos os 16px das duas divisórias — e isso supera 30%
+em qualquer janela acima de 160px. É aritmética, não verificação em tempo de
+execução: cada barra se limita sozinha, sem precisar consultar a outra.
 
 O piso de 220px é o que os campos do painel Ações precisam para não quebrar; o caso
 mais apertado é o `.dupla` (nome do dono + emoji, `grid-template-columns: 1fr 68px`).
-O teto de 30% impede o caso patológico de arrastar tudo para um lado só.
 
-**Caso de borda — telas estreitas:** abaixo de ~733px de janela, 30% é menor que
-220px e os dois limites se cruzam. Nesse caso o piso vence (`Math.max` aplicado por
-último), a barra fica travada em 220px e não se move. O comportamento degrada para
-"não redimensionável", que é exatamente o que existe hoje. Nenhum erro, nenhum
-valor negativo.
+**Por que o piso cede.** Abaixo de ~733px de janela o teto de 30% cai abaixo dos
+220px e os dois limites se cruzam. Um piso rígido venceria ali e travaria as duas
+barras em 220px cada — 440px somados, mais 16px de divisórias. Numa janela de 600px
+isso deixaria o miolo com 144px, **menor** que cada barra: exatamente a inversão que
+a feature existe para impedir. Um piso rígido só preserva a promessa acima de 677px.
+
+Cedendo (`piso = Math.min(220, teto)`), as duas barras encolhem junto com a janela,
+sempre em 30%, e o miolo continua com ~40% em qualquer largura. O custo é que abaixo
+de 733px os campos do painel Ações ficam apertados — decisão explícita do usuário:
+a promessa de que o grafo é a maior coluna vale mais que a folga nos campos, num app
+cuja razão de existir é projetar o grafo.
+
+Isso é estritamente melhor que hoje em toda largura: com as colunas fixas de 300 e
+320px, uma janela de 600px já não comporta nem as duas barras.
+
+**Os padrões também passam pelo limite.** 300 e 320 são valores de abertura, não
+valores privilegiados: somados com as duas divisórias dão 636px, então numa janela de
+800px o miolo abriria com 164px — menor que as duas barras, antes de qualquer
+arraste. A promessa valeria só depois do primeiro arraste, o que não é promessa
+nenhuma.
+
+Por isso o limite é reaplicado sobre as larguras vigentes em dois momentos além do
+arraste: na abertura da página e a cada `resize` da janela. O `resize` importa pelo
+mesmo motivo — a largura fica guardada em px, então estreitar a janela depois de um
+arraste deixaria para trás um valor que já não cabe em 30%.
+
+Num projetor de 1920px isso não faz nada: 300 e 320 estão bem abaixo dos 576px de
+teto. É exatamente o caso estreito que ele existe para cobrir.
 
 A função de clamp é pura e isolada:
 
@@ -212,9 +234,14 @@ Ficar em `ui.js` também evita criar um arquivo novo, o que obrigaria a mexer na
 - Valor no meio da faixa passa intacto.
 - Abaixo de 220 sobe para 220.
 - Acima de 30% da janela desce para 30%.
-- **Tela estreita** (janela 800px → teto 240px; janela 700px → teto 210px, abaixo do
-  piso): o piso vence, resultado é 220.
-- Entrada não-numérica ou `NaN` cai no mínimo (220) em vez de escrever `NaN` no CSS.
+- **Tela estreita** (janela 700px → teto 210px, abaixo dos 220 nominais): o piso cede
+  e o resultado é 210, não 220.
+- **A propriedade central**, atravessando os dois regimes: com as duas barras no
+  máximo, o miolo supera cada uma delas — verificado numa lista de janelas que vai de
+  400px a 3840px. Sem as janelas estreitas na lista, o teste passaria mesmo com o
+  piso inteiramente quebrado.
+- Entrada não-numérica ou `NaN`, em qualquer um dos dois argumentos, não propaga
+  `NaN` para o CSS.
 
 ### Navegador (Playwright)
 

@@ -15,7 +15,7 @@
 - **Cada módulo é uma IIFE** no formato `(function (raiz) { "use strict"; ... raiz.Nome = {...}; })(typeof globalThis !== "undefined" ? globalThis : this);`
 - **Código e comentários em português.** Comentários explicam *por quê*, não *o quê* — veja o estilo em `main.js:24` e `ui.js:200`.
 - **Larguras padrão:** esquerda `300px`, direita `320px`.
-- **Limites:** mínimo `220px`, máximo `30%` da largura da janela, passo de teclado `16px`, divisória com `8px`.
+- **Limites:** teto de `30%` da largura da janela; piso de `220px`, que **cede para o teto** quando a janela não o comporta (abaixo de ~733px). Passo de teclado `16px`, divisória com `8px`.
 - **`branches-na-pratica.html` é artefato derivado versionado.** Depois de qualquer mudança em `index.html`, `styles.css`, `ui.js` ou `main.js`, rode `node gerar-arquivo-unico.js` e comite o resultado junto.
 - **Sem persistência.** As larguras voltam a 300/320 a cada abertura da página. Não escreva nada em `localStorage`.
 
@@ -82,12 +82,12 @@ teste("clampLargura desce qualquer valor acima de 30% da janela", function () {
   igual(UI.clampLargura(1e9, 1000), 300, "arrastar para o infinito trava no teto");
 });
 
-teste("clampLargura: em tela estreita o piso vence o teto", function () {
-  // 30% de 700 é 210, abaixo do piso de 220. Os limites se cruzam e o piso
-  // ganha — a barra trava em 220 e deixa de ser redimensionável, que é
-  // exatamente o comportamento de hoje.
-  igual(UI.clampLargura(400, 700), 220);
-  igual(UI.clampLargura(100, 700), 220);
+teste("clampLargura: em tela estreita o piso cede junto com o teto", function () {
+  // 30% de 700 é 210, abaixo dos 220 nominais. O piso acompanha em vez de travar,
+  // senão as duas barras somariam 440 e sufocariam o miolo.
+  igual(UI.clampLargura(400, 700), 210, "trava no teto de 30%");
+  igual(UI.clampLargura(100, 700), 210, "o piso cedeu para 210");
+  igual(UI.clampLargura(150, 600), 180, "30% de 600");
 });
 
 teste("clampLargura nunca devolve NaN", function () {
@@ -95,13 +95,16 @@ teste("clampLargura nunca devolve NaN", function () {
   igual(UI.clampLargura(undefined, 1920), 220);
   igual(UI.clampLargura(Infinity, 1920), 220);
   igual(UI.clampLargura("300", 1920), 220, "string não conta como número");
+  igual(UI.clampLargura(300, NaN), 220, "janela invalida nao propaga NaN");
+  igual(UI.clampLargura(300, undefined), 220, "janela ausente nao propaga NaN");
 });
 
-teste("clampLargura garante o miolo maior que qualquer barra", function () {
-  // A propriedade que a feature inteira existe para preservar. Se as duas
-  // barras estão no máximo permitido, o que sobra para o miolo (descontadas
-  // as duas divisórias de 8px) ainda precisa ser maior que cada uma delas.
-  [1000, 1280, 1366, 1920, 2560, 3840].forEach(function (janela) {
+teste("clampLargura garante o miolo maior que qualquer barra, em toda largura", function () {
+  // A propriedade que a feature inteira existe para preservar. A lista cruza os
+  // DOIS regimes: acima de ~733px manda o teto de 30%; abaixo, o piso cede e as
+  // barras encolhem junto. Sem as janelas estreitas aqui, o teste passaria mesmo
+  // com o piso inteiramente quebrado.
+  [400, 500, 600, 700, 733, 800, 1000, 1280, 1366, 1920, 2560, 3840].forEach(function (janela) {
     var esq = UI.clampLargura(1e9, janela);
     var dir = UI.clampLargura(1e9, janela);
     var miolo = janela - esq - dir - 16;
@@ -124,18 +127,23 @@ Esperado: as 6 novas linhas aparecem como `FALHA` com `UI.clampLargura is not a 
 Em `ui.js`, logo depois de `"use strict";` e da declaração `var acaoAoExecutar = null;`:
 
 ```js
-  // Cada barra lateral se limita SOZINHA a [220px, 30% da janela]. Como as duas
-  // juntas nunca passam de 60%, o miolo nunca cai abaixo de ~40% e é sempre a
-  // maior coluna — aritmética, sem precisar comparar uma barra com a outra.
-  var LARGURA_MINIMA = 220;   // abaixo disto o campo de nome + emoji do painel Ações quebra
+  // Cada barra lateral se limita SOZINHA a no máximo 30% da janela. Como as duas
+  // juntas nunca passam de 60%, o miolo fica com ~40% e é sempre a maior coluna em
+  // qualquer janela acima de 160px — aritmética, sem comparar uma barra com a outra.
+  var LARGURA_MINIMA = 220;   // abaixo disto o campo de nome + emoji do painel Ações aperta
   var FRACAO_MAXIMA = 0.30;
 
   function clampLargura(desejada, larguraJanela) {
-    if (typeof desejada !== "number" || !isFinite(desejada)) return LARGURA_MINIMA;
-    // O piso é aplicado por ÚLTIMO de propósito: abaixo de ~733px de janela o
-    // teto de 30% fica menor que o piso e os dois se cruzam. Nessa ordem o piso
-    // vence e a barra apenas trava, em vez de encolher até sumir.
-    return Math.max(LARGURA_MINIMA, Math.min(desejada, larguraJanela * FRACAO_MAXIMA));
+    // Sem uma janela válida não há teto a calcular.
+    if (typeof larguraJanela !== "number" || !isFinite(larguraJanela)) return LARGURA_MINIMA;
+    var teto = larguraJanela * FRACAO_MAXIMA;
+    // O piso CEDE quando a janela é estreita demais para bancá-lo. Travar as duas
+    // barras em 220px numa janela de 600px deixaria o miolo com 144px — menor que
+    // elas, quebrando a única promessa da feature. Cedendo junto, as duas ficam em
+    // 30% e o miolo continua com ~40%.
+    var piso = Math.min(LARGURA_MINIMA, teto);
+    if (typeof desejada !== "number" || !isFinite(desejada)) return piso;
+    return Math.max(piso, Math.min(desejada, teto));
   }
 ```
 
@@ -392,14 +400,30 @@ Depois da função `montar`, e antes de `limparCampos`:
       else return;
       ev.preventDefault();
     });
+
+    // Devolve um jeito de reaplicar o limite sobre a largura atual, sem mexer nela
+    // de propósito. Quem chama: a abertura da página e o resize da janela.
+    return function () { aplicar(larguraAtual()); };
   }
 
   function montarDivisorias(aoRedimensionar) {
     var colunas = document.querySelector(".colunas");
-    configurarDivisoria(pegar("divisoria-esq"), "--col-esq", PADRAO_ESQ, true, colunas, aoRedimensionar);
-    configurarDivisoria(pegar("divisoria-dir"), "--col-dir", PADRAO_DIR, false, colunas, aoRedimensionar);
+    var reancorarEsq = configurarDivisoria(pegar("divisoria-esq"), "--col-esq", PADRAO_ESQ, true, colunas, aoRedimensionar);
+    var reancorarDir = configurarDivisoria(pegar("divisoria-dir"), "--col-dir", PADRAO_DIR, false, colunas, aoRedimensionar);
+
+    // As larguras padrão não passam pelo clamp sozinhas. Numa janela de 800px,
+    // 300 + 320 + 16 deixa o miolo com 164px — menor que as duas barras, logo na
+    // abertura e antes de qualquer arraste. O mesmo vale quando o professor
+    // estreita a janela depois: o valor em px guardado continua sendo o antigo.
+    // Sem estas duas chamadas a promessa da feature só passa a valer depois do
+    // primeiro arraste.
+    function reancorar() { reancorarEsq(); reancorarDir(); }
+    reancorar();
+    window.addEventListener("resize", reancorar);
   }
 ```
+
+Este listener de `resize` convive com o que já existe em `main.js:98`. A ordem é a de registro, e `montarDivisorias` é chamada antes — então a largura já está corrigida quando `redesenhar` lê `clientWidth`. Mesmo fora de ordem o resultado se corrige sozinho, porque `aplicar` agenda `aoRedimensionar` no quadro seguinte.
 
 E acrescentar ao objeto exportado:
 
