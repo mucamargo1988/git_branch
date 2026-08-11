@@ -398,6 +398,99 @@ teste("commitsAlcancaveis devolve lista vazia quando a ponta atual é o único c
   igual(Repo.commitsAlcancaveis(e), [], "o único commit é a própria ponta, não entra na lista");
 });
 
+// ---------- repo.js: excluirBranch ----------
+
+// A feature de cenarioDivergente mesclada de volta na master. HEAD na master.
+// Devolve { estado, c1, c2 } — c2 é o commit que só existia na feature.
+function cenarioMesclado() {
+  var c = cenarioDivergente();
+  return { estado: Repo.merge(c.estado, "feature").estado, c1: c.c1, c2: c.c2 };
+}
+
+teste("estado inicial: nenhuma faixa apagada", function () {
+  igual(Repo.estadoInicial().faixasApagadas, []);
+});
+
+teste("excluirBranch apaga branch mesclada sem tocar em commits nem devs", function () {
+  var m = cenarioMesclado();
+  var r = Repo.excluirBranch(m.estado, "feature", false);
+  verdade(r.ok, r.erro);
+  igual(Repo.acharBranch(r.estado, "feature"), null, "a etiqueta some");
+  igual(r.estado.branches.length, 1, "só a master fica");
+  igual(r.estado.commits.length, m.estado.commits.length, "nenhum commit se mexe");
+  igual(r.estado.devs.length, m.estado.devs.length, "a dona continua na lista: os commits dela precisam do avatar");
+  igual(Repo.orfaos(r.estado), [], "o merge já tinha trazido tudo para a master");
+});
+
+teste("excluirBranch guarda o rastro da faixa apagada", function () {
+  var m = cenarioMesclado();
+  var br = Repo.acharBranch(m.estado, "feature");
+  var r = Repo.excluirBranch(m.estado, "feature", false);
+  igual(r.estado.faixasApagadas, [{ faixa: br.faixa, nome: "feature", cor: br.cor }]);
+});
+
+teste("excluirBranch registra -d sem forçar e -D com forçar", function () {
+  var m = cenarioMesclado();
+  var r = Repo.excluirBranch(m.estado, "feature", false);
+  igual(r.comando, "git branch -d feature");
+  igual(r.estado.historico[r.estado.historico.length - 1].comando, "git branch -d feature");
+  igual(Repo.excluirBranch(cenarioDivergente().estado, "feature", true).comando, "git branch -D feature");
+});
+
+teste("excluirBranch recusa a branch atual, e forçar não contorna", function () {
+  var m = cenarioMesclado();
+  igual(Repo.excluirBranch(m.estado, "master", false).ok, false);
+  igual(Repo.excluirBranch(m.estado, "master", true).ok, false,
+    "é isso que garante que nunca sobra repositório sem branch");
+});
+
+teste("excluirBranch recusa branch inexistente", function () {
+  igual(Repo.excluirBranch(comUmCommit(), "nao-existe", false).ok, false);
+});
+
+teste("excluirBranch recusa branch não mesclada sem forçar", function () {
+  var c = cenarioDivergente(); // a feature tem c2, que a master não alcança
+  var r = Repo.excluirBranch(c.estado, "feature", false);
+  igual(r.ok, false);
+  verdade(r.erro.indexOf("Forçar") !== -1, "o erro precisa apontar para o controle da tela");
+  igual(Repo.orfaos(c.estado), [], "recusar não pode mexer em nada");
+});
+
+teste("excluirBranch com forçar apaga a não mesclada e deixa os commits órfãos", function () {
+  var c = cenarioDivergente();
+  var r = Repo.excluirBranch(c.estado, "feature", true);
+  verdade(r.ok, r.erro);
+  igual(r.estado.commits.length, 3, "o commit continua existindo, só ficou inalcançável");
+  igual(Repo.orfaos(r.estado), [c.c2], "c2 perdeu a única etiqueta que o alcançava");
+});
+
+teste("branch criada e nunca commitada é apagável sem forçar", function () {
+  var e = Repo.criarBranch(comUmCommit(), "vazia", { nome: "Ana", emoji: "👩" }, false).estado;
+  verdade(Repo.excluirBranch(e, "vazia", false).ok,
+    "aponta para o mesmo commit da master: não há o que perder");
+});
+
+teste("master é apagável quando não é a branch atual", function () {
+  var e = Repo.checkout(cenarioDivergente().estado, "feature").estado;
+  e = Repo.merge(e, "master").estado; // agora a master está mesclada na feature
+  verdade(Repo.excluirBranch(e, "master", false).ok, "master não é especial, é um ponteiro com nome combinado");
+});
+
+teste("excluirBranch não muta o estado recebido", function () {
+  var m = cenarioMesclado();
+  var antes = JSON.stringify(m.estado);
+  Repo.excluirBranch(m.estado, "feature", false);
+  igual(JSON.stringify(m.estado), antes, "o estado original não pode mudar");
+});
+
+teste("excluirBranch aceita estado antigo, sem o campo faixasApagadas", function () {
+  var m = cenarioMesclado();
+  delete m.estado.faixasApagadas; // como os do localStorage antigo e os da pilha de desfazer
+  var r = Repo.excluirBranch(m.estado, "feature", false);
+  verdade(r.ok, r.erro);
+  igual(r.estado.faixasApagadas.length, 1, "o campo nasce na hora, sem quebrar");
+});
+
 // ---------- layout.js ----------
 
 function acharNo(l, id) {

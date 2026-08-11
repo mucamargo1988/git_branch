@@ -35,6 +35,7 @@
       HEAD: { branch: "master" },
       devs: [{ id: "voce", nome: "Você", emoji: "🧑‍💻" }],
       historico: [{ n: 1, comando: "git init" }],
+      faixasApagadas: [],
       proximoId: 1,
       proximaFaixa: 1
     };
@@ -183,6 +184,58 @@
       comando = "git branch " + nome;
     }
 
+    registrar(e, comando);
+    return { ok: true, estado: e, comando: comando };
+  }
+
+  function excluirBranch(estado, nome, forcar) {
+    var alvo = acharBranch(estado, nome);
+    if (!alvo) {
+      return { ok: false, erro: "A branch " + nome + " não existe." };
+    }
+    // O Git real também recusa. Aqui isso vale dobrado: é este bloqueio que
+    // garante que nenhuma sequência de operações leva a um repositório sem
+    // branch nenhuma, com o HEAD apontando para o vazio. Por isso não existe
+    // versão forçada dele.
+    if (estado.HEAD.branch === nome) {
+      return { ok: false, erro: "Não dá para apagar a branch em que você está. Faça checkout em outra antes." };
+    }
+
+    // Mesmo teste que o merge usa para dizer "Already up to date": se a ponta do
+    // alvo já é ancestral da ponta da atual, tudo que ele tinha continua
+    // alcançável depois que a etiqueta sumir — não há o que perder. Branch sem
+    // ponta cai no mesmo balde por não ter nada a perder de saída.
+    var atual = branchAtual(estado);
+    var mesclada = !alvo.pontaId || ehAncestral(estado, alvo.pontaId, atual.pontaId);
+    if (!mesclada && !forcar) {
+      return {
+        ok: false,
+        erro: "A branch " + nome + " não foi mesclada em " + atual.nome +
+          ". Marque \"Forçar (-D)\" para apagar mesmo assim — os commits dela ficam abandonados."
+      };
+    }
+
+    var e = clonar(estado);
+    // Estados gravados antes desta feature (localStorage de uma aula em
+    // andamento, pilha de desfazer) não têm o campo.
+    if (!e.faixasApagadas) e.faixasApagadas = [];
+
+    for (var i = 0; i < e.branches.length; i++) {
+      if (e.branches[i].nome === nome) {
+        // O rastro é o que mantém cor e rótulo da faixa depois que a única fonte
+        // dos dois — a branch em e.branches — sai da lista. Sem ele, commits
+        // VIVOS da faixa apareceriam cinzas, e cinza no app inteiro quer dizer
+        // "abandonado".
+        e.faixasApagadas.push({ faixa: e.branches[i].faixa, nome: nome, cor: e.branches[i].cor });
+        e.branches.splice(i, 1);
+        break;
+      }
+    }
+
+    // Commits, devs e HEAD não são tocados: quem decide se algum commit vai para
+    // a faixa fantasma é orfaos(), pela alcançabilidade, sem saber que houve um
+    // delete.
+    var comando = "git branch " + (forcar ? "-D " : "-d ") + nome;
     registrar(e, comando);
     return { ok: true, estado: e, comando: comando };
   }
@@ -342,6 +395,7 @@
     commit: commit,
     editarDev: editarDev,
     criarBranch: criarBranch,
+    excluirBranch: excluirBranch,
     checkout: checkout,
     alcancaveis: alcancaveis,
     ehAncestral: ehAncestral,
