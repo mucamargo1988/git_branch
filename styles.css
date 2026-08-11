@@ -280,6 +280,44 @@ input[type="text"]:focus, select:focus {
   font-size: 13px; font-weight: 800; fill: var(--texto); dominant-baseline: central;
 }
 
+/* ---------- barras de rolagem ---------- */
+
+/* Discretas de propósito: num projetor, uma barra larga e clara rouba atenção do
+   grafo, que é o objeto da aula. Fina, sem trilha visível, e com contraste maior
+   só quando o cursor chega perto. Discreta, não invisível — sumir por completo
+   esconderia do professor que o painel rola. */
+.coluna-esquerda, .coluna-direita, .area-grafo {
+  scrollbar-width: thin;
+  scrollbar-color: var(--borda) transparent;
+}
+
+/* As duas de cima só valem em Firefox e Chrome recente. Sem este bloco, Safari e
+   Chrome mais antigo continuariam com a barra cinza-clara do sistema — que é
+   exatamente o que queremos evitar. */
+.coluna-esquerda::-webkit-scrollbar,
+.coluna-direita::-webkit-scrollbar,
+.area-grafo::-webkit-scrollbar { width: 9px; height: 9px; }
+
+.coluna-esquerda::-webkit-scrollbar-track,
+.coluna-direita::-webkit-scrollbar-track,
+.area-grafo::-webkit-scrollbar-track { background: transparent; }
+
+.coluna-esquerda::-webkit-scrollbar-thumb,
+.coluna-direita::-webkit-scrollbar-thumb,
+.area-grafo::-webkit-scrollbar-thumb {
+  background: var(--borda);
+  border-radius: 6px;
+}
+
+.coluna-esquerda::-webkit-scrollbar-thumb:hover,
+.coluna-direita::-webkit-scrollbar-thumb:hover,
+.area-grafo::-webkit-scrollbar-thumb:hover { background: var(--texto-apagado); }
+
+/* O quadradinho onde as barras horizontal e vertical se encontram, só na área do
+   grafo. Sem isto ele fica com o cinza padrão e denuncia a barra que acabamos de
+   discretizar. */
+.area-grafo::-webkit-scrollbar-corner { background: transparent; }
+
 @media (prefers-reduced-motion: reduce) {
   .aresta, .no, .etiqueta { transition: none; }
 }
